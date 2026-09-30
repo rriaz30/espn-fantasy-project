@@ -1,12 +1,12 @@
 import json
 
-def saveStatsToJson(allTeamStats, filename):
+def saveDataToJson(allTeamStats, filename):
     filename = filename + ".json"
     with open(filename, "w") as file:
         json.dump(allTeamStats, file, indent=4)
     print("Saved to JSON file:", filename)
 
-def loadStatsFromJson(filename):
+def loadDataFromJson(filename):
     filename = filename + ".json"
     with open(filename, "r") as file:
         allTeamStats = json.load(file)

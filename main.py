@@ -20,7 +20,7 @@ swid = os.environ["ESPN_SWID"]
 
 # Assuming this script is in ESPN_API/python/
 projectDir = Path(__file__).resolve().parent.parent
-outputDir = projectDir / "python/output"
+outputDir = projectDir / "espn-fantasy-project/output"
 
 def clearConsole():
     os.system("cls")
@@ -59,6 +59,7 @@ def getWeeklyPositionReport(filePath, allTeamStats):
 
 def main():
     allTeamStats = {}
+    nflSchedule = {}
 
     while True:
         print("\n===== ESPN Fantasy Analyzer =====")
@@ -66,6 +67,7 @@ def main():
         print("2. Load saved data")
         print("3. Generate Overall Points Allowed report")
         print("4. Generate Points Allowed by Week per Position report")
+        print("5. See full team schedule")
         print("9. Exit")
 
         choice = input("\nSelect an option: ")
@@ -73,12 +75,14 @@ def main():
 
         if choice == "1":
             print("Fetching ESPN data...")
-            allTeamStats = espn_data.fetchNflData(league_id, year, espn_s2, swid)
-            json_util.saveStatsToJson(allTeamStats, "storeTeamStatsData")
+            allTeamStats = espn_data.fetchNflData(league_id, year, espn_s2, swid, nflSchedule)
+            json_util.saveDataToJson(allTeamStats, "storeTeamStatsData")
+            json_util.saveDataToJson(nflSchedule, "storeNflSchedule")
 
         elif choice == "2":
             print("Loading saved data...")
-            allTeamStats = json_util.loadStatsFromJson("storeTeamStatsData")
+            allTeamStats = json_util.loadDataFromJson("storeTeamStatsData")
+            nflSchedule = json_util.loadDataFromJson("storeNflSchedule")
 
         elif choice == "3":
             if not allTeamStats:
@@ -96,6 +100,12 @@ def main():
             getWeeklyPositionReport(excelFile, allTeamStats)
             excelFile = excelFile.with_suffix(".xlsx")
             os.startfile(excelFile)
+
+        elif choice == "5":
+            print("Printing Full NFL Team Schedule")
+            filePath = outputDir / "NflSchedule.xlsx"
+            excel_util.scheduleToExcel(nflSchedule, filePath)
+            os.startfile(filePath)
 
         elif choice == "9":
             print("Goodbye!")

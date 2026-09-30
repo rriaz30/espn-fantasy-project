@@ -14,7 +14,7 @@ from constants import POSITIONS, NFL_TEAMS
 #league = League(league_id, year, espn_s2, swid, fetch_league=True)
 
 
-def fetchNflData(league_id, year, espn_s2, swid):
+def fetchNflData(league_id, year, espn_s2, swid, nflSchedule):
     # private league with cookies
     league = League(league_id, year, espn_s2, swid)
     print("Current league week: ", league.current_week)
@@ -27,11 +27,40 @@ def fetchNflData(league_id, year, espn_s2, swid):
     allTeamStats = {}
     # teamAverageStats = {}
 
+    print("Getting Team Stats")
     for team in NFL_TEAMS:
         print("Loading team data for", team)
         stats = getPtsAllowedStats(league, players, team)
         allTeamStats[team] = stats
-        # teamAverageStats[team] = allTeamStats[team]['averages']
+
+    print("\nBuilding NFL Teams Schedule")
+
+    pro_schedule = league._get_all_pro_schedule()
+    for team in NFL_TEAMS:
+        print("Get team sched for", team)
+        # find team key 
+        for key, val in PRO_TEAM_MAP.items():
+            if val == team:
+                teamKey = key
+                # print("found team key: ", teamKey)
+                break
+
+        teamSched = pro_schedule[teamKey]
+        listOfOpp = []
+        for i in range(1, 19):
+            weekNumber = str(i)
+            try:
+                game = teamSched[str(i)][0]
+                if game["awayProTeamId"] == teamKey:
+                    opp = game["homeProTeamId"]
+                else: opp = game["awayProTeamId"]
+                oppName = PRO_TEAM_MAP[opp]
+            except:
+                oppName = 'BYE'
+            listOfOpp.append(oppName)
+
+        nflSchedule[team] = listOfOpp
+
 
     print("\nTeam data loaded succesfully")
 

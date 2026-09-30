@@ -261,3 +261,22 @@ def writeTitle(ws, title):
 
     cell.alignment = Alignment(horizontal="center", vertical="center")
     ws.row_dimensions[1].height = 28
+
+def scheduleToExcel(schedule, filePath):
+
+    df = pd.DataFrame.from_dict(
+        schedule,
+        orient="index"
+    )
+
+    # Create Week 1, Week 2, ... column names
+    df.columns = [
+        f"{week}"
+        for week in range(1, len(df.columns) + 1)
+    ]
+
+    # Name the left-most index
+    df.index.name = "Team"
+
+    # Write to Excel
+    df.to_excel(filePath, sheet_name="NFL Schedule")
