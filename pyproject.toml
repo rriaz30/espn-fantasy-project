@@ -1,0 +1,17 @@
+[project]
+name = "espn-fantasy-project"
+version = "0.1.0"
+description = "ESPN fantasy football analysis and reporting"
+readme = "README.md"
+authors = [
+    { name = "Ricky Riaz", email = "rickyriaz30@gmail.com" }
+]
+requires-python = ">=3.12"
+
+dependencies = [
+    "espn-api>=1.0.0",
+    "openpyxl>=3.1.5",
+    "pandas>=3.0.6",
+    "python-dotenv>=1.2.4",
+    "pywin32>=312",
+]
