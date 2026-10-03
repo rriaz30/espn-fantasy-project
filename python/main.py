@@ -43,6 +43,24 @@ def getWeeklyPositionReport(filePath, allTeamStats):
     # Color rankings in excel
     excel_util.colorRankings(filePath)
 
+def getPosRanks(allTeamStats, nflSchedule, currentWeek):
+    
+    for team in constants.NFL_TEAMS:
+
+        nflSchedule[team]["ranks"] = {}
+
+        for pos in constants.POSITIONS:
+
+            ptsByWeek = espn_data.getPtsByWeek(pos, allTeamStats)
+            ptsByWeek = espn_data.addRunningRanks(ptsByWeek)
+
+            nflSchedule[team]["ranks"][pos] = ptsByWeek[team][str(currentWeek)][2]
+
+def getCurrentWeek(allTeamStats):
+    currentWeek = len(allTeamStats['ARI']['weeks'])
+    return currentWeek
+
+
 ################################################
 ################################################
 ################################################
@@ -58,6 +76,17 @@ def main():
     allTeamStats = {}
     nflSchedule = {}
 
+    print("Checking for saved data")
+    dataDir = Path(__file__).resolve().parent.parent / "data"
+    teamStatsJson = dataDir / "TeamStatsData.json"
+    scheduleJson = dataDir / "NflSchedule.json"
+    if teamStatsJson.exists() and scheduleJson.exists():
+        print("Found saved data. Loading...")
+        allTeamStats = json_util.loadDataFromJson(teamStatsJson)
+        nflSchedule = json_util.loadDataFromJson(scheduleJson)
+    else:
+        print("No data exists. Fetch data first.")
+
     while True:
         print("\n===== ESPN Fantasy Analyzer =====")
         print("1. Fetch ESPN data")
@@ -65,6 +94,7 @@ def main():
         print("3. Generate Overall Points Allowed report")
         print("4. Generate Points Allowed by Week per Position report")
         print("5. See full team schedule")
+        print("6. Generate full team schedule with Positional Heat Map")
         print("9. Exit")
 
         choice = input("\nSelect an option: ")
@@ -116,9 +146,39 @@ def main():
             print("Printing Full NFL Team Schedule")
             excelFile = outputDir / "NflSchedule.xlsx"
             excel_util.closeExcelFile(excelFile)
-            excel_util.scheduleToExcel(nflSchedule, excelFile)
+            currentWeek = getCurrentWeek(allTeamStats)
+            excel_util.scheduleToExcel(nflSchedule, excelFile, currentWeek)
             os.startfile(excelFile)
 
+
+        elif choice == "6":
+            if not allTeamStats:
+                print("No data has been loaded yet. Load data and try again.")
+                continue
+            print("Available Positions: QB, RB, WR, TE, K, DEF")
+            validInput = False
+            while validInput == False:
+                pos = input("\nSelect a Position: ")
+                if pos == "DEF":
+                    posTag = "D/ST"
+                if posTag in constants.POSITIONS:
+                    validInput = True
+                else: print("Invalid position selected. Try again.")
+
+            
+            print("Calculating...")
+            currentWeek = getCurrentWeek(allTeamStats)
+            getPosRanks(allTeamStats, nflSchedule, currentWeek)
+            # print(nflSchedule)
+            posFileName = pos + "-ColorNflSchedule.xlsx"
+            excelFile = outputDir / posFileName
+            excel_util.closeExcelFile(excelFile)
+            excel_util.scheduleToExcel(nflSchedule, excelFile, currentWeek)
+            excel_util.colorScheduleByPosition(nflSchedule, excelFile, posTag, currentWeek)
+
+            print("Printing NFL Schedule with Positional Heat Map for Current Week for",pos)
+            os.startfile(excelFile)
+            
 
         elif choice == "9":
             print("Goodbye!")

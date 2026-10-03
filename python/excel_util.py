@@ -1,8 +1,8 @@
 import pandas as pd
-from openpyxl.styles import Font, Alignment
-from openpyxl.styles import PatternFill
+from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 from openpyxl.utils import get_column_letter
 from openpyxl import load_workbook
+from openpyxl.worksheet.worksheet import Worksheet
 import win32com.client
 from pathlib import Path
 
@@ -15,6 +15,22 @@ lightGreen = "C6EFCE"
 # Red range
 lightRed = "FFC7CE"
 darkRed = "9C0006"
+
+greenColors = [
+    "147D39", "208A43", "31994E", "49A75F",
+    "62B674", "7CC48B", "96D2A3", "B1DFBB",
+    "CCEBD3", "E5F5E9"
+]
+
+redColors = [
+    "FDE8E8", "FBDADA", "F8CACA", "F4B6B6",
+    "EE9D9D", "E88080", "DF6262", "D54747",
+    "C92F2F", "B91F1F", "991B1B"
+]
+
+# Borders
+thin = Side(style="thin")
+thick = Side(style="thick")
 
 # excel functions
 def interpolateColor(startColor, endColor, percent):
@@ -55,11 +71,7 @@ def printOverallPosRankToExcel(allTeamStats, excelFile: str):
         columns.append(position + " Rank")
 
     df = df[columns]
-    # print(df)
-    # try:
-    #     df.to_excel("avgPtsAllowed.xlsx")
-    # except PermissionError:
-    #     print("ERROR: Close open excel file and try again.")
+
     print("Finished creating Points Allowed excel file:", excelFile)
 
     with pd.ExcelWriter(excelFile, engine="openpyxl") as writer:
@@ -68,10 +80,12 @@ def printOverallPosRankToExcel(allTeamStats, excelFile: str):
         df.to_excel(
             writer,
             sheet_name="Points Allowed",
-            startrow=2
+            startrow=1
         )
 
         ws = writer.sheets["Points Allowed"]
+
+        formatCells(ws)
 
         # Merge the title across all table columns
         last_col = df.shape[1] + 1
@@ -86,13 +100,13 @@ def printOverallPosRankToExcel(allTeamStats, excelFile: str):
         title = ws.cell(row=1, column=1)
         title.value = "Points Allowed By Position"
         title.font = Font(size=20, bold=True)
-        title.alignment = Alignment(horizontal="center")
+        title.alignment = Alignment(horizontal="center", vertical="center")
 
         # Increase the title row's height
         ws.row_dimensions[1].height = 35
 
-        headerRow = 3
-        firstDataRow = 4
+        headerRow = 2
+        firstDataRow = 3
         lastDataRow = firstDataRow + len(df) - 1
 
         for col in range(2, ws.max_column + 1):
@@ -106,6 +120,8 @@ def printOverallPosRankToExcel(allTeamStats, excelFile: str):
 
                     cell = ws.cell(row=row, column=col)
                     rank = cell.value
+
+                    cell.border = Border(right=thin)
 
                     if rank is None:
                         continue
@@ -169,6 +185,8 @@ def writePositionSheet(writer, df, pos, title):
 
     ws = writer.sheets[sheetName]
 
+    formatCells(ws)
+
     # Remove the extra row pandas creates
     ws.delete_rows(4)
     ws["A2"] = "Team"
@@ -197,6 +215,9 @@ def colorRankings(filePath):
         # Find every column with a Rank header
         for cell in ws[3]:
 
+            if cell.value == "Running Avg":
+                cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+                
             if cell.value != "Rank":
                 continue
 
@@ -204,7 +225,7 @@ def colorRankings(filePath):
 
             # Color each rank in that column
             for row in range(4, ws.max_row + 1):
-
+                    
                 rankCell = ws.cell(row=row, column=rankCol)
                 rank = rankCell.value
 
@@ -263,10 +284,15 @@ def writeTitle(ws, title):
     cell.alignment = Alignment(horizontal="center", vertical="center")
     ws.row_dimensions[1].height = 28
 
-def scheduleToExcel(schedule, filePath):
+def scheduleToExcel(schedule, filePath, currentWeek):
+    
+    games = {}
+
+    for team in schedule:
+        games[team] = schedule[team]["games"]
 
     df = pd.DataFrame.from_dict(
-        schedule,
+        games,
         orient="index"
     )
 
@@ -282,16 +308,119 @@ def scheduleToExcel(schedule, filePath):
     # Write to Excel
     df.to_excel(filePath, sheet_name="NFL Schedule")
 
+    # formatting
+    wb = load_workbook(filePath)
+    ws = wb["NFL Schedule"]
+    formatCells(ws)
+    formatScheduleSheet(ws, currentWeek)
+
+    wb.save(filePath)
+
+def colorScheduleByPosition(schedule, filePath, pos, currentWeek):
+
+    wb = load_workbook(filePath)
+    ws = wb["NFL Schedule"]
+
+    formatCells(ws)
+
+    for row in range(2, ws.max_row + 1):
+
+        for col in range(2, ws.max_column + 1):
+
+            cell = ws.cell(row=row, column=col)
+            opponent = cell.value
+
+            if opponent == "BYE":
+                continue
+
+            rank = schedule[opponent]["ranks"][pos]
+
+            # Rank 1-10 = green
+            if rank <= 10:
+                color = greenColors[rank - 1]
+                cell.fill = PatternFill(
+                    fill_type="solid",
+                    fgColor=color
+                )
+
+            # Rank 22-32 = red
+            elif rank >= 22:
+                color = redColors[rank - 22]
+                cell.fill = PatternFill(
+                    fill_type="solid",
+                    fgColor=color
+                )
+
+    formatScheduleSheet(ws, currentWeek)
+
+    wb.save(filePath)
+
+def formatCells(ws: Worksheet):
+    for row in ws.iter_rows():
+        ws.row_dimensions[row[0].row].height = 34
+
+        for cell in row:
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+
+def formatScheduleSheet(ws: Worksheet, currentWeek):
+
+    # Row 1
+    for cell in ws[1]:
+        cell.border = Border(bottom=thin)
+
+    # Column 1
+    for row in range(1, ws.max_row + 1):
+
+        cell = ws.cell(row=row, column=1)
+
+        if row == 1:
+            cell.border = Border(
+                bottom=thin,
+                right=thin
+            )
+        else:
+            cell.border = Border(right=thin)
+
+    currentWeekCol = currentWeek + 1
+
+    for row in range(1, ws.max_row + 1):
+
+        cell = ws.cell(row=row, column=currentWeekCol)
+
+        cell.font = Font(bold=True)
+
+        if row == 1:
+            cell.border = Border(
+                left=thick,
+                right=thick,
+                top=thick,
+                bottom=thin
+            )
+
+        elif row == ws.max_row:
+            cell.border = Border(
+                left=thick,
+                right=thick,
+                bottom=thick
+            )
+
+        else:
+            cell.border = Border(
+                left=thick,
+                right=thick
+            )
+
 def closeExcelFile(filePath):
 
     fileName = Path(filePath).name
 
     try:
         excel = win32com.client.GetActiveObject("Excel.Application")
+        workbooks = excel.Workbooks
     except Exception:
         return
 
-    for workbook in excel.Workbooks:
+    for workbook in workbooks:
 
         if workbook.Name.lower() == fileName.lower():
             workbook.Close(SaveChanges=False)

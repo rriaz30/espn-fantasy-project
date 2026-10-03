@@ -37,12 +37,12 @@ def fetchNflData(league_id, year, espn_s2, swid, nflSchedule):
 
     pro_schedule = league._get_all_pro_schedule()
     for team in NFL_TEAMS:
-        print("Get team sched for", team)
+        nflSchedule[team] = {}
+        print("Getting team sched for", team)
         # find team key 
         for key, val in PRO_TEAM_MAP.items():
             if val == team:
                 teamKey = key
-                # print("found team key: ", teamKey)
                 break
 
         teamSched = pro_schedule[teamKey]
@@ -59,8 +59,7 @@ def fetchNflData(league_id, year, espn_s2, swid, nflSchedule):
                 oppName = 'BYE'
             listOfOpp.append(oppName)
 
-        nflSchedule[team] = listOfOpp
-
+        nflSchedule[team]["games"] = listOfOpp
 
     print("\nTeam data loaded succesfully")
 
@@ -298,3 +297,15 @@ def addRunningRanks(ptsByWeek):
             previousRank = rank
 
     return ptsByWeek
+
+def getCurrentRanks(ptsByWeek):
+    currentRanks = {}
+
+    currentWeek = list(
+        next(iter(ptsByWeek.values())).keys()
+    )[-1]
+
+    for team in ptsByWeek:
+        currentRanks[team] = ptsByWeek[team][currentWeek][2]
+
+    return currentRanks
