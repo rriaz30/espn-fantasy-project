@@ -26,16 +26,19 @@ outputDir.mkdir(parents=True, exist_ok=True)
 def clearConsole():
     os.system("cls")
 
-def getWeeklyPositionReport(filePath, allTeamStats):
+def getWeeklyPositionReport(filePath, allTeamStats, option):
 
+    if option == "allowed":
+        optionStr = "Allowed"
+    else: optionStr = "Scored"
     with pd.ExcelWriter(filePath, engine="openpyxl") as writer:
 
         for pos in constants.POSITIONS:
-            ptsByWeek = espn_data.getPtsByWeek(pos, allTeamStats)
+            ptsByWeek = espn_data.getPtsByWeek(pos, allTeamStats, option)
             ptsByWeek = espn_data.addRunningRanks(ptsByWeek)
             df = excel_util.createPositionDataFrame(ptsByWeek)
 
-            title = pos + " - Points Allowed By Week"
+            title = pos + f" - Points {optionStr} By Week"
             excel_util.writePositionSheet(writer, df, pos, title)
 
     print(f"Saved Excel file to {filePath}")
@@ -43,7 +46,7 @@ def getWeeklyPositionReport(filePath, allTeamStats):
     # Color rankings in excel
     excel_util.colorRankings(filePath)
 
-def getPosRanks(allTeamStats, nflSchedule, currentWeek):
+def getPosRanks(allTeamStats, nflSchedule, currentWeek, option):
     
     for team in constants.NFL_TEAMS:
 
@@ -51,7 +54,7 @@ def getPosRanks(allTeamStats, nflSchedule, currentWeek):
 
         for pos in constants.POSITIONS:
 
-            ptsByWeek = espn_data.getPtsByWeek(pos, allTeamStats)
+            ptsByWeek = espn_data.getPtsByWeek(pos, allTeamStats, option)
             ptsByWeek = espn_data.addRunningRanks(ptsByWeek)
 
             nflSchedule[team]["ranks"][pos] = ptsByWeek[team][str(currentWeek)][2]
@@ -60,17 +63,9 @@ def getCurrentWeek(allTeamStats):
     currentWeek = len(allTeamStats['ARI']['weeks'])
     return currentWeek
 
-
 ################################################
 ################################################
 ################################################
-
-
-# testing for one team
-# ptsAllowed = getPtsAllowedStats(players, "LAR")
-# printStats(ptsAllowed)
-
-# printOverallPosRankToExcel("testing.xlsx")
 
 def main():
     allTeamStats = {}
@@ -123,20 +118,43 @@ def main():
             if not allTeamStats:
                 print("No data has been loaded yet. Load data and try again.")
                 continue
+            print("Generate Points Report for Allowed or Scored\nAllowed = 1\nScored = 2")
+            validInput = False
+            while validInput == False:
+                option = input("\nSelect an option: ")
+                if option == str(1):
+                    optionStr = "allowed"
+                    validInput = True
+                elif option == str(2):
+                    optionStr = "scored"
+                    validInput = True
+                else: print("Invalid position selected. Try again.")
+            
             print("Generating Overall report...")
-            excelFile = outputDir / "OverallReport.xlsx"
+            excelFile = outputDir / f"OverallReport-{optionStr}.xlsx"
             excel_util.closeExcelFile(excelFile)
-            excel_util.printOverallPosRankToExcel(allTeamStats, excelFile)
+            excel_util.printOverallPosRankToExcel(allTeamStats, excelFile, optionStr)
             os.startfile(excelFile)
 
         elif choice == "4":
             if not allTeamStats:
                 print("No data has been loaded yet. Load data and try again.")
                 continue
+            print("Generate Weekly Position Report for Allowed or Scored\nAllowed = 1\nScored = 2")
+            validInput = False
+            while validInput == False:
+                option = input("\nSelect an option: ")
+                if option == str(1):
+                    optionStr = "allowed"
+                    validInput = True
+                elif option == str(2):
+                    optionStr = "scored"
+                    validInput = True
+                else: print("Invalid position selected. Try again.")
             print("Generating Weekly Position report...")
-            excelFile = outputDir / "WeeklyPosReport.xlsx"
+            excelFile = outputDir / f"WeeklyPosReport-{optionStr}.xlsx"
             excel_util.closeExcelFile(excelFile)
-            getWeeklyPositionReport(excelFile, allTeamStats)
+            getWeeklyPositionReport(excelFile, allTeamStats, optionStr)
             os.startfile(excelFile)           
 
         elif choice == "5":
@@ -155,20 +173,32 @@ def main():
             if not allTeamStats:
                 print("No data has been loaded yet. Load data and try again.")
                 continue
+            print("Generate NFL Schedule with Positional Heat Map")
             print("Available Positions: QB, RB, WR, TE, K, DEF")
             validInput = False
             while validInput == False:
                 pos = input("\nSelect a Position: ")
                 if pos == "DEF":
                     posTag = "D/ST"
+                else: posTag =pos
                 if posTag in constants.POSITIONS:
                     validInput = True
                 else: print("Invalid position selected. Try again.")
+            print("Allowed or Scored\nAllowed = 1\nScored = 2")
+            validInput = False
+            while validInput == False:
+                option = input("\nSelect an option: ")
+                if option == str(1):
+                    optionStr = "allowed"
+                    validInput = True
+                elif option == str(2):
+                    optionStr = "scored"
+                    validInput = True
+                else: print("Invalid position selected. Try again.")
 
-            
             print("Calculating...")
             currentWeek = getCurrentWeek(allTeamStats)
-            getPosRanks(allTeamStats, nflSchedule, currentWeek)
+            getPosRanks(allTeamStats, nflSchedule, currentWeek, optionStr)
             # print(nflSchedule)
             posFileName = pos + "-ColorNflSchedule.xlsx"
             excelFile = outputDir / posFileName

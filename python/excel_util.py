@@ -44,7 +44,7 @@ def interpolateColor(startColor, endColor, percent):
 
     return "".join(f"{value:02X}" for value in rgb)
 
-def printOverallPosRankToExcel(allTeamStats, excelFile: str):
+def printOverallPosRankToExcel(allTeamStats, excelFile: str, option: str):
     # load points allowed by pos for each team
     print("Calculating points allowed by position for each team")
     
@@ -52,10 +52,9 @@ def printOverallPosRankToExcel(allTeamStats, excelFile: str):
 
     for team in NFL_TEAMS:
         # print(team)
-        teamAverageStats[team] = allTeamStats[team]['averages']
+        teamAverageStats[team] = allTeamStats[team]['averages'][option]
 
     # create excel sheet for pts allowed
-
     df = pd.DataFrame.from_dict(teamAverageStats, orient="index")
     df.index.name = "Team"
 
@@ -72,18 +71,21 @@ def printOverallPosRankToExcel(allTeamStats, excelFile: str):
 
     df = df[columns]
 
-    print("Finished creating Points Allowed excel file:", excelFile)
+    if option == "allowed":
+        optionTitle = "Allowed"
+    else: optionTitle = "Scored"
+    print(f"Finished creating Points {optionTitle} excel file: {excelFile}")
 
     with pd.ExcelWriter(excelFile, engine="openpyxl") as writer:
 
         # Start the table on row 3, leaving room for the title
         df.to_excel(
             writer,
-            sheet_name="Points Allowed",
+            sheet_name="Points " + optionTitle,
             startrow=1
         )
 
-        ws = writer.sheets["Points Allowed"]
+        ws = writer.sheets["Points " + optionTitle]
 
         formatCells(ws)
 
@@ -98,7 +100,7 @@ def printOverallPosRankToExcel(allTeamStats, excelFile: str):
 
         # Add and format the title
         title = ws.cell(row=1, column=1)
-        title.value = "Points Allowed By Position"
+        title.value = f"Points {optionTitle} By Position"
         title.font = Font(size=20, bold=True)
         title.alignment = Alignment(horizontal="center", vertical="center")
 

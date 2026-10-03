@@ -133,14 +133,27 @@ def getPtsAllowedStats(league: League, players: list, team: str):
     stats = {
         "weeks":{},
         "totals":{
-            "QB":0,
-            "WR":0,
-            "RB":0,
-            "TE":0,
-            "K":0,
-            "D/ST":0
+            "allowed": {
+                "QB":0,
+                "RB":0,
+                "WR":0,
+                "TE":0,
+                "K":0,
+                "D/ST":0
+            },
+            "scored": {
+                "QB":0,
+                "RB":0,
+                "WR":0,
+                "TE":0,
+                "K":0,
+                "D/ST":0
+            }
         },
-        "averages":{},
+        "averages":{
+            "allowed": {},
+            "scored": {}
+        },
         "gamesPlayed":int
     }
 
@@ -158,11 +171,15 @@ def getPtsAllowedStats(league: League, players: list, team: str):
 
         stats["weeks"][weekNumber] = {
             "opp": oppName,
-            "played": gamePlayed
+            "played": gamePlayed,
+            "allowed": {},
+            "scored": {}
         }
 
         for position in POSITIONS:
             # print("pos = ",position)
+            # get points allowed
+            # iter thru opp pos players and add them up
             oppPosPlayers = getPosPlayersByTeam(players, position, oppName)
             ptsAllowed = 0
             for player in oppPosPlayers:
@@ -172,10 +189,25 @@ def getPtsAllowedStats(league: League, players: list, team: str):
                     # print("ptsAllowed running total = ", ptsAllowed)
 
             # posStats[position][i] = round(ptsAllowed, 1)
-            stats["weeks"][weekNumber][position] = round(ptsAllowed, 1)
-            stats["totals"][position] += round(ptsAllowed, 1)
+            stats["weeks"][weekNumber]["allowed"][position] = round(ptsAllowed, 1)
+            stats["totals"]["allowed"][position] += round(ptsAllowed, 1)
 
-            if stats["weeks"][weekNumber][position] != 0:
+            # get points scored
+            # iter thru own pos players and add them up
+            ownPosPlayers = getPosPlayersByTeam(players, position, team)
+            ptsScored = 0
+            for player in ownPosPlayers:
+                # print("player =", player.name)
+                if i in player.stats:
+                    ptsScored += player.stats[i].get("points", 0 )
+                    # print("ptsAllowed running total = ", ptsAllowed)
+
+            # posStats[position][i] = round(ptsAllowed, 1)
+            stats["weeks"][weekNumber]["scored"][position] = round(ptsScored, 1)
+            stats["totals"]["scored"][position] += round(ptsScored, 1)
+
+
+            if stats["weeks"][weekNumber]["allowed"][position] != 0:
                 gamePlayed = 1
 
         if gamePlayed == 1:
@@ -184,43 +216,50 @@ def getPtsAllowedStats(league: League, players: list, team: str):
 
     # calc avg pts allowed
     for position in POSITIONS:
-        stats["averages"][position] = round(stats["totals"][position]/gamesPlayed, 1)
+        stats["averages"]["allowed"][position] = round(stats["totals"]["allowed"][position]/gamesPlayed, 1)
+        stats["averages"]["scored"][position] = round(stats["totals"]["scored"][position]/gamesPlayed, 1)
 
     stats['gamesPlayed'] = gamesPlayed
     return stats
 
-### Structure for stats
+# # Team Stats Structure
 # {
 #     "weeks": {
 #         "1": {
 #             "opp": "DAL",
-#             "QB": 18.5,
-#             "WR": 31.2,
-#             "RB": 22.4,
-#             "TE": 8.7,
-#             "K": 9.0,
-#             "D/ST": 5.0
-#             "played": 1
-#         },
-#         "2": {
-#             "opp": "KC",
-#             ...
+#             "played": 1,
+
+#             "allowed": {
+#                 "QB": 0
+#             },
+
+#             "scored": {
+#                 "QB": 0
+#             }
 #         }
 #     },
 
+#     "gamesPlayed": 1,
+
 #     "totals": {
-#         "QB": 40.2,
-#         "WR": 65.7,
-#         ...
+#         "allowed": {
+#             "QB": 0
+#         },
+
+#         "scored": {
+#             "QB": 0
+#         }
 #     },
 
 #     "averages": {
-#         "QB": 20.1,
-#         "WR": 32.85,
-#         ...
-#     },
+#         "allowed": {
+#             "QB": 0
+#         },
 
-#     "gamesPlayed": int
+#         "scored": {
+#             "QB": 0
+#         }
+#     }
 # }
 
 def printStats(stats: {}):
@@ -238,7 +277,7 @@ def printStats(stats: {}):
         print(f"{position}: {stats['averages'][position]:.1f}", end="\t")
     print()
 
-def getPtsByWeek(pos: str, allTeamStats: {}):
+def getPtsByWeek(pos: str, allTeamStats: {}, option):
 
     ptsByWeek = {}
     currentWeek = len(allTeamStats['ARI']['weeks'])
@@ -251,12 +290,13 @@ def getPtsByWeek(pos: str, allTeamStats: {}):
             weekStats = [0,0]
             weekNum = str(week)
             weekData = allTeamStats[team]['weeks'][weekNum]
+            weekPosData = weekData[option]
 
             if weekData['played'] == 1:
                 gamesPlayed += 1
 
-            weekStats[0] = weekData[pos]
-            totalPts = totalPts + weekData[pos]
+            weekStats[0] = weekPosData[pos]
+            totalPts = totalPts + weekPosData[pos]
 
             runningAvg = round(totalPts/gamesPlayed, 1)
             weekStats[1] = runningAvg
