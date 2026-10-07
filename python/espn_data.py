@@ -1,3 +1,6 @@
+import truststore
+truststore.inject_into_ssl()
+
 # NFL Import
 from espn_api.football import League
 from espn_api.football import Player
