@@ -257,6 +257,7 @@ def main():
 
         elif choice == "8":
             players = json_util.loadDataFromJson(playersJson)
+
             # experiment - calc 'real' def rank, maybe this could lead to more 
             if not allTeamStats:
                 print("No data has been loaded yet. Load data and try again.")
@@ -273,9 +274,13 @@ def main():
                     validInput = True
                 else: print("Invalid position selected. Try again.")
             stats = {}
-            # get stats of team points scored per game and their avg and their opp
-            teamScoresSorted = {}
 
+            # find best def pts allowed ranks
+            ptsByWeek = espn_data.getPtsByWeek(pos, allTeamStats, option="allowed")
+            ptsByWeek = espn_data.addRunningRanks(ptsByWeek)
+            currRanks = espn_data.getCurrentRanks(ptsByWeek)
+            # get stats of team points scored per game and their avg and their opp
+            playersList = {}
             for p in players:
                 if ((p["position"] == pos and p["proTeam"] != "None" and p["onTeamId"] == 0)
                     or 
@@ -293,6 +298,7 @@ def main():
 
                     ptDiffTotal = 0
                     ptTotal = 0
+                    oppAllowedAvgTotal = 0
                     # ratio player's avg pts scored/player's team's pts scored
                     if ("0" not in p["stats"]): continue
                     ptsScoredTeamRatio = p["stats"]["0"]["avg_points"] / allTeamStats[p["proTeam"]]["averages"]["scored"][pos]
@@ -305,6 +311,7 @@ def main():
                             opp = p["schedule"][str(i)]["team"]
                             oppAllowed = allTeamStats[opp]["weeks"][str(i)]["allowed"][pos]
                             oppAllowedAvg = allTeamStats[opp]["averages"]["allowed"][pos]
+                            oppAllowedAvgTotal += oppAllowedAvg
 
                             # match pos:
                             #     case "RB": normalizeAllowedAvg = 2
@@ -327,31 +334,67 @@ def main():
                     playerStats["average"] = p["stats"]["0"]["avg_points"]
                     try:
                         playerStats["ptDiffAverage"] = ptDiffTotal / (len(p["stats"]) - 1)
+                        playerStats["ptDiffAvgByPct"] = ptDiffTotal / (oppAllowedAvgTotal / (len(p["stats"]) - 1))
                     except ZeroDivisionError:
                         playerStats["ptDiffAverage"] = 0
 
                     # now find curr opp avg pts allowed
                     currWeek = getCurrentWeek(allTeamStats)
-                    currOpp = nflSchedule[teamName]["games"][(currWeek)]
+                    currOpp = nflSchedule[teamName]["games"][(currWeek-1)] # -1 because python is 0 based
                     # handle bye week
                     if (currOpp == "BYE"): continue
+                    playerStats["currOpp"] = currOpp
+                    playerStats["currOppRank"] = allTeamStats[currOpp]["averages"]["allowed"]
                     currOppAvgAllowed = allTeamStats[currOpp]["averages"]["allowed"][pos]
 
-                    playerStats["weightedScore"] = playerStats["average"]*0.5 + playerStats["ptDiffAverage"]*0.25 + currOppAvgAllowed*ptsScoredTeamRatio*0.25
-
-                    stats[teamName] = playerStats
+                    playerStats["weightedScore1"] = playerStats["average"]*0.5 + playerStats["ptDiffAverage"]*0.25 + currOppAvgAllowed*ptsScoredTeamRatio*0.25
+                    playerStats["weightedScore2"] = playerStats["average"]*0.5 + currOppAvgAllowed*ptsScoredTeamRatio*0.5*playerStats["ptDiffAvgByPct"]
 
                     # print(f"{teamName}: weightedScore = {teamStats["weightedScore"]}")
-                    teamScoresSorted[playerName] = playerStats["weightedScore"]
+                    playersList[playerName] = playerStats
 
-            for player, score in sorted(teamScoresSorted.items(), key=lambda x: x[1], reverse=True):
-                if score > 1 :
-                    print(player, score)
+            playersSortedWS1 = {}
+            playersSortedWS2 = {}
+            ptThreshold1 = 5
+            ptThreshold2 = 3
+            for player, stats in sorted(playersList.items()):
+                if stats["weightedScore1"] > ptThreshold1 :
+                    playersSortedWS1[player] = round(stats["weightedScore1"], 1)
+                if stats["weightedScore2"] > ptThreshold2 :
+                    playersSortedWS2[player] = round(stats["weightedScore2"], 1)
 
+            dataWS1 = {
+                "name": [],
+                "ws1": [],
+                "opp": [],
+                "rank" : []
+            }
+            dataWS2 = {
+                "name": [],
+                "ws1": [],
+                "opp": [],
+                "rank" : []
+            }
 
+            print("Top Players based on WS1")
+            for player, score in sorted(playersSortedWS1.items(), key=lambda x: x[1], reverse=True):
+                dataWS1["name"].append(player)
+                dataWS1["ws1"].append(score)
+                dataWS1["opp"].append(playersList[player]["currOpp"])
+                dataWS1["rank"].append(currRanks[playersList[player]["currOpp"]])
 
+            df = pd.DataFrame(dataWS1)
+            print(df)
 
+            print("\nTop Players based on WS2")
+            for player, score in sorted(playersSortedWS2.items(), key=lambda x: x[1], reverse=True):
+                dataWS2["name"].append(player)
+                dataWS2["ws1"].append(score)
+                dataWS2["opp"].append(playersList[player]["currOpp"])
+                dataWS2["rank"].append(currRanks[playersList[player]["currOpp"]])
 
+            df = pd.DataFrame(dataWS2)
+            print(df)
 
         elif choice == "9":
             print("Goodbye!")
