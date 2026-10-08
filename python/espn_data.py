@@ -14,31 +14,46 @@ from constants import POSITIONS, NFL_TEAMS
 #league = League(league_id, year, espn_s2, swid, fetch_league=True)
 
 
-def fetchNflData(league_id, year, espn_s2, swid, nflSchedule):
+def fetchNflData(league_id, year, espn_s2, swid, nflSchedule, players, fantasyTeams):
     # private league with cookies
     league = League(league_id, year, espn_s2, swid)
     print("Current league week: ", league.current_week)
 
     # load players
-    print("Loading all possible NFL fantasy players for your league")
-    players = getPlayers(league, league.current_week)
+    print("Loading all NFL fantasy players for your league")
+    # players = getPlayers(league, league.current_week)
+    players.extend(getPlayers(league, league.current_week))
+
+    print("Total player pool:", len(players))
+
+    # load fantasy team rosters
+    print("Loading fantasy rosters")
+    fantasyTeamsData = league.teams
+
+    for team in fantasyTeamsData:
+        teamData = {}
+        teamData["teamName"] = team.team_name
+        teamData["teamAbbrev"] = team.team_abbrev
+        roster = []
+        for p in team.roster:
+            roster.append(p.name)
+        teamData["players"] = roster
+        fantasyTeams[team.team_id] = teamData
 
     # load nfl team stats
     allTeamStats = {}
     # teamAverageStats = {}
 
-    print("Getting Team Stats")
+    print("Getting NFL Team Stats")
     for team in NFL_TEAMS:
         print("Loading team data for", team)
         stats = getPtsAllowedStats(league, players, team)
         allTeamStats[team] = stats
 
     print("\nBuilding NFL Teams Schedule")
-
     pro_schedule = league._get_all_pro_schedule()
     for team in NFL_TEAMS:
         nflSchedule[team] = {}
-        print("Getting team sched for", team)
         # find team key 
         for key, val in PRO_TEAM_MAP.items():
             if val == team:
@@ -70,6 +85,11 @@ def fetchNflData(league_id, year, espn_s2, swid, nflSchedule):
     # }
 
     return allTeamStats
+
+# def getFreeAgents(league_id, year, espn_s2, swid):
+#     league = League(league_id, year, espn_s2, swid)
+#     return league.free_agents(league.current_week, 1)
+
 
 def getPosPlayersByTeam(
     players: list,
@@ -161,7 +181,10 @@ def getPtsAllowedStats(league: League, players: list, team: str):
 
     for i in range(1, league.current_week+1):
         weekNumber = str(i)
-        game = teamSched[str(i)][0]
+        try:
+            game = teamSched[str(i)][0]
+        except:
+            continue
         if game["awayProTeamId"] == teamKey:
             opp = game["homeProTeamId"]
         else: opp = game["awayProTeamId"]
@@ -277,7 +300,7 @@ def printStats(stats: {}):
         print(f"{position}: {stats['averages'][position]:.1f}", end="\t")
     print()
 
-def getPtsByWeek(pos: str, allTeamStats: {}, option):
+def getPtsByWeek(pos: str, allTeamStats: {}, option="allowed"):
 
     ptsByWeek = {}
     currentWeek = len(allTeamStats['ARI']['weeks'])
