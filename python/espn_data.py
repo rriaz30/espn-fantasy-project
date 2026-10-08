@@ -184,10 +184,31 @@ def getPtsAllowedStats(league: League, players: list, team: str):
 
     for i in range(1, league.current_week+1):
         weekNumber = str(i)
-        try:
-            game = teamSched[str(i)][0]
-        except:
+        # check if week is a bye week
+        if ((str(i)) not in teamSched):
+            stats["weeks"]["5"] = {
+                "opp": "BYE",
+                "played": 0,
+                "allowed": {
+                    "QB":0,
+                    "RB":0,
+                    "WR":0,
+                    "TE":0,
+                    "K":0,
+                    "D/ST":0
+                },
+                "scored": {
+                    "QB":0,
+                    "RB":0,
+                    "WR":0,
+                    "TE":0,
+                    "K":0,
+                    "D/ST":0
+                }
+            }
             continue
+
+        game = teamSched[str(i)][0]
         if game["awayProTeamId"] == teamKey:
             opp = game["homeProTeamId"]
         else: opp = game["awayProTeamId"]
@@ -315,6 +336,8 @@ def getPtsByWeek(pos: str, allTeamStats: {}, option="allowed"):
         for week in range(1, currentWeek+1):
             weekStats = [0,0]
             weekNum = str(week)
+            # if (team == "CAR"):
+            #     print(allTeamStats["CAR"])
             weekData = allTeamStats[team]['weeks'][weekNum]
             weekPosData = weekData[option]
 

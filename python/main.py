@@ -240,6 +240,7 @@ def main():
                     defFree[p["proTeam"]] = p
 
                     # find curr opp
+                    if ((str(currWeek)) not in p["schedule"]): continue
                     defFreeOpp[p["schedule"][str(currWeek)]["team"]] = p["proTeam"]
 
             # find best def pts allowed ranks
@@ -255,6 +256,7 @@ def main():
             ### need to finish. stopped at able to see def fa left and their rank and opp rank
 
         elif choice == "8":
+            players = json_util.loadDataFromJson(playersJson)
             # experiment - calc 'real' def rank, maybe this could lead to more 
             if not allTeamStats:
                 print("No data has been loaded yet. Load data and try again.")
@@ -281,7 +283,7 @@ def main():
                     # print(p["name"])
                     teamName = p["proTeam"]
                     playerName = p["name"]
-                    teamStats = {
+                    playerStats = {
                         "name":playerName,
                         "ptsScored":[],
                         "opp":[],
@@ -291,25 +293,29 @@ def main():
 
                     ptDiffTotal = 0
                     ptTotal = 0
+                    # ratio player's avg pts scored/player's team's pts scored
+                    if ("0" not in p["stats"]): continue
+                    ptsScoredTeamRatio = p["stats"]["0"]["avg_points"] / allTeamStats[p["proTeam"]]["averages"]["scored"][pos]
                     for i in range(1,len(p["stats"])):
                         if str(i) in p["stats"]:
-                            teamStats["ptsScored"].append(p["stats"][str(i)]["points"])
-                            teamStats["opp"].append(p["schedule"][str(i)]["team"])
-                            teamScored = p["stats"][str(i)]["points"]
-                            ptTotal += teamScored
+                            playerStats["ptsScored"].append(p["stats"][str(i)]["points"])
+                            playerStats["opp"].append(p["schedule"][str(i)]["team"])
+                            playerScored = p["stats"][str(i)]["points"]
+                            ptTotal += playerScored
                             opp = p["schedule"][str(i)]["team"]
                             oppAllowed = allTeamStats[opp]["weeks"][str(i)]["allowed"][pos]
                             oppAllowedAvg = allTeamStats[opp]["averages"]["allowed"][pos]
 
-                            match pos:
-                                case "RB": normalizeAllowedAvg = 2
-                                case "TE": normalizeAllowedAvg = 2
-                                case "WR": normalizeAllowedAvg = 4
-                                case _: normalizeAllowedAvg = 1
+                            # match pos:
+                            #     case "RB": normalizeAllowedAvg = 2
+                            #     case "TE": normalizeAllowedAvg = 2
+                            #     case "WR": normalizeAllowedAvg = 4
+                            #     case _: normalizeAllowedAvg = 1
 
-                            oppAllowedAvg = oppAllowedAvg/normalizeAllowedAvg
-                            teamStats["ptScoredMinusOppAvg"].append(teamScored-oppAllowedAvg)
-                            ptDiffTotal += (teamScored-oppAllowedAvg)
+                            # oppAllowedAvg = oppAllowedAvg/normalizeAllowedAvg
+                            oppAllowedAvg = oppAllowedAvg * ptsScoredTeamRatio
+                            playerStats["ptScoredMinusOppAvg"].append(playerScored-oppAllowedAvg)
+                            ptDiffTotal += (playerScored-oppAllowedAvg)
                         else: continue
 
                     if ptTotal == 0:
@@ -318,27 +324,29 @@ def main():
                         # cant we calc everything here? calc points diff, we have he opp,
                         # maybe we can look up how many pts they allowed here every week? in allTeamStats?
 
-                    teamStats["average"] = p["stats"]["0"]["avg_points"]
+                    playerStats["average"] = p["stats"]["0"]["avg_points"]
                     try:
-                        teamStats["ptDiffAverage"] = ptDiffTotal / (len(p["stats"]) - 1)
+                        playerStats["ptDiffAverage"] = ptDiffTotal / (len(p["stats"]) - 1)
                     except ZeroDivisionError:
-                        teamStats["ptDiffAverage"] = 0
+                        playerStats["ptDiffAverage"] = 0
 
                     # now find curr opp avg pts allowed
                     currWeek = getCurrentWeek(allTeamStats)
-                    currOpp = nflSchedule[teamName]["games"][(currWeek-1)]
+                    currOpp = nflSchedule[teamName]["games"][(currWeek)]
+                    # handle bye week
+                    if (currOpp == "BYE"): continue
                     currOppAvgAllowed = allTeamStats[currOpp]["averages"]["allowed"][pos]
 
-                    teamStats["weightedScore"] = teamStats["average"]*0.5 + teamStats["ptDiffAverage"]*0.25 + currOppAvgAllowed*0.25
+                    playerStats["weightedScore"] = playerStats["average"]*0.5 + playerStats["ptDiffAverage"]*0.25 + currOppAvgAllowed*ptsScoredTeamRatio*0.25
 
-                    stats[teamName] = teamStats
+                    stats[teamName] = playerStats
 
                     # print(f"{teamName}: weightedScore = {teamStats["weightedScore"]}")
-                    teamScoresSorted[playerName] = teamStats["weightedScore"]
+                    teamScoresSorted[playerName] = playerStats["weightedScore"]
 
-            for team, score in sorted(teamScoresSorted.items(), key=lambda x: x[1], reverse=True):
-                if score > 10 :
-                    print(team, score)
+            for player, score in sorted(teamScoresSorted.items(), key=lambda x: x[1], reverse=True):
+                if score > 1 :
+                    print(player, score)
 
 
 
