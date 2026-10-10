@@ -32,7 +32,7 @@ redColors = [
 thin = Side(style="thin")
 thick = Side(style="thick")
 
-# excel functions
+# excel helper functions functions
 def interpolateColor(startColor, endColor, percent):
     start = tuple(int(startColor[i:i+2], 16) for i in (0, 2, 4))
     end = tuple(int(endColor[i:i+2], 16) for i in (0, 2, 4))
@@ -44,6 +44,18 @@ def interpolateColor(startColor, endColor, percent):
 
     return "".join(f"{value:02X}" for value in rgb)
 
+def addFilter(ws):
+    # Add filters to every column
+    for row in ws.iter_rows():
+        if any(cell.value == "Rank" for cell in row):
+            ws.auto_filter.ref = (
+                f"A{row[0].row}:"
+                f"{ws.cell(ws.max_row, ws.max_column).coordinate}"
+            )
+            break
+
+
+# main exce lfunctions
 def printOverallPosRankToExcel(allTeamStats, excelFile: str, option: str):
     # load points allowed by pos for each team
     print("Calculating points allowed by position for each team")
@@ -159,6 +171,7 @@ def printOverallPosRankToExcel(allTeamStats, excelFile: str, option: str):
                             fill_type="solid",
                             fgColor=color
                         )
+        addFilter(ws)
 
 def createPositionDataFrame(ptsByWeek):
     rows = {}
@@ -194,6 +207,8 @@ def writePositionSheet(writer, df, pos, title):
     ws["A2"] = "Team"
     writeTitle(ws, title)
     ws.freeze_panes = "B4"
+
+    addFilter(ws)    
 
 def colorRankings(filePath):
 

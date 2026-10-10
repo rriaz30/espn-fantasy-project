@@ -324,16 +324,21 @@ def printStats(stats: {}):
         print(f"{position}: {stats['averages'][position]:.1f}", end="\t")
     print()
 
-def getPtsByWeek(pos: str, allTeamStats: {}, option="allowed"):
+def getPtsByWeek(pos: str, allTeamStats: {}, option="allowed", weeksRequested = 0):
 
     ptsByWeek = {}
     currentWeek = len(allTeamStats['ARI']['weeks'])
+
+    if weeksRequested == 0:
+        initWeek = 1
+    else:
+        initWeek = currentWeek - weeksRequested
 
     for team in NFL_TEAMS:
         ptsByWeek[team] = {}
         gamesPlayed = 0
         totalPts = 0
-        for week in range(1, currentWeek+1):
+        for week in range(initWeek, currentWeek):
             weekStats = [0,0]
             weekNum = str(week)
             # if (team == "CAR"):

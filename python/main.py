@@ -4,6 +4,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 # project imports
+import analyzer
 import espn_data
 import constants
 import excel_util
@@ -30,10 +31,19 @@ scheduleJson = dataDir / "NflSchedule.json"
 playersJson = dataDir / "Players.json"
 fantasyTeamsJson = dataDir / "FantasyTeams.json"
 
+# init data structs
+allTeamStats = {}
+nflSchedule = {}
+players = []
+fantasyTeams = {}
+
+# init global var
+currentWeek = 0
+
 def clearConsole():
     os.system("cls")
 
-def getWeeklyPositionReport(filePath, allTeamStats, option):
+def getWeeklyPositionReport(filePath, allTeamStats, option, weeksRequested = 0):
 
     if option == "allowed":
         optionStr = "Allowed"
@@ -41,7 +51,7 @@ def getWeeklyPositionReport(filePath, allTeamStats, option):
     with pd.ExcelWriter(filePath, engine="openpyxl") as writer:
 
         for pos in constants.POSITIONS:
-            ptsByWeek = espn_data.getPtsByWeek(pos, allTeamStats, option)
+            ptsByWeek = espn_data.getPtsByWeek(pos, allTeamStats, option, weeksRequested)
             ptsByWeek = espn_data.addRunningRanks(ptsByWeek)
             df = excel_util.createPositionDataFrame(ptsByWeek)
 
@@ -53,7 +63,7 @@ def getWeeklyPositionReport(filePath, allTeamStats, option):
     # Color rankings in excel
     excel_util.colorRankings(filePath)
 
-def getPosRanks(allTeamStats, nflSchedule, currentWeek, option):
+def getPosRanks(allTeamStats, nflSchedule, option):
     
     for team in constants.NFL_TEAMS:
 
@@ -65,10 +75,6 @@ def getPosRanks(allTeamStats, nflSchedule, currentWeek, option):
             ptsByWeek = espn_data.addRunningRanks(ptsByWeek)
 
             nflSchedule[team]["ranks"][pos] = ptsByWeek[team][str(currentWeek)][2]
-
-def getCurrentWeek(allTeamStats):
-    currentWeek = len(allTeamStats['ARI']['weeks'])
-    return currentWeek
 
 def loadJsonData():
     
@@ -83,32 +89,145 @@ def loadJsonData():
         print("Missing Data files. Fetch data first.")
         return {}, {}, [], {}
 
-################################################
-################################################
-################################################
+def fetchESPNdata():
+    print(print("Fetching ESPN data... TODO"))
+
+def generateReportsMenu():
+    while True:
+
+        print("\n===== ESPN Fantasy Analyzer =====")
+        print  ("**** Generate Ranking Reports ***\n")
+        print("1. Overall Points and Rankings")
+        print("2. Weekly Points and Rankings")
+        print("3. Filter Reports for most recent weeks")
+        print("9. Return to Main Menu")
+
+        choice = input("\nSelect an option: ")
+        clearConsole()
+
+        if choice == "1":
+            print("Generate Overall Points and Rankings")
+            optionStr = getPtsType()
+            print("Generating report...")
+            
+            excelFile = outputDir / f"OverallReport-{optionStr}.xlsx"
+            excel_util.closeExcelFile(excelFile)
+            excel_util.printOverallPosRankToExcel(allTeamStats, excelFile, optionStr)
+            os.startfile(excelFile)
+
+        elif choice == "2":
+            print("Generate Weekly Position Report")
+            optionStr = getPtsType()
+            print("Generating Weekly Position report...")
+            
+            excelFile = outputDir / f"WeeklyPosReport-{optionStr}.xlsx"
+            excel_util.closeExcelFile(excelFile)
+            getWeeklyPositionReport(excelFile, allTeamStats, optionStr)
+            os.startfile(excelFile)
+
+        elif choice == "3":
+            print("Generate Weekly Points Report for Allowed or Scored filtered for most recent weeks")
+            weeksReq = input("Enter how many past weeks of data you want to filter for:")
+            weeksReq = int(weeksReq)
+            optionStr = getPtsType()
+            
+            print("Generating Weekly Position report...")
+            excelFile = outputDir / f"WeeklyPosReport-{optionStr}-past-{weeksReq}-weeks.xlsx"
+            excel_util.closeExcelFile(excelFile)
+            getWeeklyPositionReport(excelFile, allTeamStats, optionStr, weeksReq)
+            os.startfile(excelFile)   
+
+        elif choice == "9":
+            print("Returning to Main Menu")
+            break
+
+        else:
+            print("Invalid option. Try again.")
+
+def schedulesMenu():
+    schedCurrWeek = currentWeek + 1 # have to adjust for current week to make it the actual week
+    while True:
+
+        print("\n===== ESPN Fantasy Analyzer =====")
+        print  ("****** Generate Schedules *******\n")
+        print("\n*** Generate Schedules ***")
+        print("1. See All NFL Schedule")
+        print("2. Overlay NFL Schedule with Heat Map")
+        print("9. Return to Main Menu")
+
+        choice = input("\nSelect an option: ")
+        clearConsole()
+
+        if choice == "1":
+            print("Printing Full NFL Team Schedule")
+            excelFile = outputDir / "NflSchedule.xlsx"
+            excel_util.closeExcelFile(excelFile)
+            excel_util.scheduleToExcel(nflSchedule, excelFile, schedCurrWeek)
+            os.startfile(excelFile)
+
+        elif choice == "2":
+            print("Generate NFL Schedule with Positional Heat Map")
+            posTag = getPosInput()
+            optionStr = getPtsType()
+
+            if posTag == "D/ST":
+                pos = "DEF"
+            else: pos = posTag
+
+            print("Calculating...")
+            getPosRanks(allTeamStats, nflSchedule, optionStr)
+            posFileName = pos + "-ColorNflSchedule.xlsx"
+            excelFile = outputDir / posFileName
+            excel_util.closeExcelFile(excelFile)
+            excel_util.scheduleToExcel(nflSchedule, excelFile, schedCurrWeek)
+            excel_util.colorScheduleByPosition(nflSchedule, excelFile, posTag, schedCurrWeek)
+
+            print("Printing NFL Schedule with Positional Heat Map for Current Week for",pos)
+            os.startfile(excelFile)
+
+        elif choice == "9":
+            print("Returning to Main Menu")
+            break
+
+        else:
+            print("Invalid option. Try again.")
+
+
+################################################################################################
+################################################################################################
+################################################################################################
 
 def main():
-
-    # init data structs
-    allTeamStats = {}
-    nflSchedule = {}
-    freeAgents = []
-    players = []
-    fantasyTeams = {}
+    global allTeamStats, nflSchedule, players, fantasyTeams, currentWeek
 
     print("Checking for saved data")
     allTeamStats, nflSchedule, players, fantasyTeams = loadJsonData()
+    currentWeek = len(allTeamStats['ARI']['weeks']) - 1
 
+    # check if data has been loaded
     while True:
-        print("\n===== ESPN Fantasy Analyzer =====")
-        print("1. Fetch ESPN data")
-        print("2. Load saved data")
-        print("3. Generate Overall Points Allowed report")
-        print("4. Generate Points Allowed by Week per Position report")
-        print("5. See full team schedule")
-        print("6. Generate full team schedule with Positional Heat Map")
-        print("9. Exit")
+        dataValid = checkLoadedData(allTeamStats)
+        if (dataValid == False):
+            while dataValid == False:
+                print("No Data loaded. Either fetch ESPN data(1) or load from Json file(2)")
+                dataInput = input("Select an option:")
+                if dataInput == "1":
+                    fetchESPNdata()
+                elif dataInput == "2":
+                    print("Loading saved data...")
+                    allTeamStats, nflSchedule, players, fantasyTeams = loadJsonData()
+                else: print("Invalid position selected. Try again.")
+                dataValid = checkLoadedData(allTeamStats)
 
+        # data exists, enter main loop
+        print("\n===== ESPN Fantasy Analyzer =====")
+        print  ("=========== Main Menu ===========")
+        print("1. Fetch ESPN data")
+        print("2. Generate Points/Rank Reports")
+        print("3. Generate Schedules")
+        print("4. Player Analyzer WIP")
+        print("9. Exit")
+        
         choice = input("\nSelect an option: ")
         clearConsole()
 
@@ -117,7 +236,6 @@ def main():
             # first reset data structs
             allTeamStats = {}
             nflSchedule = {}
-            freeAgents = []
             players = []
             fantasyTeams = {}
 
@@ -130,102 +248,10 @@ def main():
             json_util.saveDataToJson(fantasyTeams, dataDir / fantasyTeamsJson)
 
         elif choice == "2":
-            print("Loading saved data...")
-            allTeamStats, nflSchedule, players, fantasyTeams = loadJsonData()
+            generateReportsMenu()       
 
         elif choice == "3":
-            if not allTeamStats:
-                print("No data has been loaded yet. Load data and try again.")
-                continue
-            print("Generate Points Report for Allowed or Scored\nAllowed = 1\nScored = 2")
-            validInput = False
-            while validInput == False:
-                option = input("\nSelect an option: ")
-                if option == str(1):
-                    optionStr = "allowed"
-                    validInput = True
-                elif option == str(2):
-                    optionStr = "scored"
-                    validInput = True
-                else: print("Invalid position selected. Try again.")
-            
-            print("Generating Overall report...")
-            excelFile = outputDir / f"OverallReport-{optionStr}.xlsx"
-            excel_util.closeExcelFile(excelFile)
-            excel_util.printOverallPosRankToExcel(allTeamStats, excelFile, optionStr)
-            os.startfile(excelFile)
-
-        elif choice == "4":
-            if not allTeamStats:
-                print("No data has been loaded yet. Load data and try again.")
-                continue
-            print("Generate Weekly Position Report for Allowed or Scored\nAllowed = 1\nScored = 2")
-            validInput = False
-            while validInput == False:
-                option = input("\nSelect an option: ")
-                if option == str(1):
-                    optionStr = "allowed"
-                    validInput = True
-                elif option == str(2):
-                    optionStr = "scored"
-                    validInput = True
-                else: print("Invalid position selected. Try again.")
-            print("Generating Weekly Position report...")
-            excelFile = outputDir / f"WeeklyPosReport-{optionStr}.xlsx"
-            excel_util.closeExcelFile(excelFile)
-            getWeeklyPositionReport(excelFile, allTeamStats, optionStr)
-            os.startfile(excelFile)           
-
-        elif choice == "5":
-            if not allTeamStats:
-                print("No data has been loaded yet. Load data and try again.")
-                continue
-            print("Printing Full NFL Team Schedule")
-            excelFile = outputDir / "NflSchedule.xlsx"
-            excel_util.closeExcelFile(excelFile)
-            currentWeek = getCurrentWeek(allTeamStats)
-            excel_util.scheduleToExcel(nflSchedule, excelFile, currentWeek)
-            os.startfile(excelFile)
-
-
-        elif choice == "6":
-            if not allTeamStats:
-                print("No data has been loaded yet. Load data and try again.")
-                continue
-            print("Generate NFL Schedule with Positional Heat Map")
-            print("Available Positions: QB, RB, WR, TE, K, DEF")
-            validInput = False
-            while validInput == False:
-                pos = input("\nSelect a Position: ")
-                if pos == "DEF":
-                    posTag = "D/ST"
-                else: posTag = pos
-                if posTag in constants.POSITIONS:
-                    validInput = True
-                else: print("Invalid position selected. Try again.")
-            print("Allowed or Scored\nAllowed = 1\nScored = 2")
-            validInput = False
-            while validInput == False:
-                option = input("\nSelect an option: ")
-                if option == str(1):
-                    optionStr = "allowed"
-                    validInput = True
-                elif option == str(2):
-                    optionStr = "scored"
-                    validInput = True
-                else: print("Invalid position selected. Try again.")
-
-            print("Calculating...")
-            currentWeek = getCurrentWeek(allTeamStats)
-            getPosRanks(allTeamStats, nflSchedule, currentWeek, optionStr)
-            posFileName = pos + "-ColorNflSchedule.xlsx"
-            excelFile = outputDir / posFileName
-            excel_util.closeExcelFile(excelFile)
-            excel_util.scheduleToExcel(nflSchedule, excelFile, currentWeek)
-            excel_util.colorScheduleByPosition(nflSchedule, excelFile, posTag, currentWeek)
-
-            print("Printing NFL Schedule with Positional Heat Map for Current Week for",pos)
-            os.startfile(excelFile)
+            schedulesMenu()
 
         elif choice == "7":
             print("Get free agents available vs bottom rank opponents")
@@ -233,15 +259,15 @@ def main():
             defFree = {}
             defFreeTop10 = []
             defFreeOpp = {}
-            currWeek = getCurrentWeek(allTeamStats)
             for p in players:
                 if p["position"] == "D/ST" and p["onTeamId"] == 0:
                     print(p["name"])
                     defFree[p["proTeam"]] = p
 
                     # find curr opp
-                    if ((str(currWeek)) not in p["schedule"]): continue
-                    defFreeOpp[p["schedule"][str(currWeek)]["team"]] = p["proTeam"]
+                    schedcurrWeek = currentWeek + 1
+                    if ((str(schedcurrWeek)) not in p["schedule"]): continue
+                    defFreeOpp[p["schedule"][str(schedcurrWeek)]["team"]] = p["proTeam"]
 
             # find best def pts allowed ranks
             ptsByWeek = espn_data.getPtsByWeek("D/ST", allTeamStats, option="allowed")
@@ -249,152 +275,16 @@ def main():
 
             
             for team, week in ptsByWeek.items():
-                if week[str(currWeek)][2] <= 16 and team in defFreeOpp:
+                if week[str(currentWeek)][2] <= 16 and team in defFreeOpp:
                     faTeam = defFreeOpp[team]
-                    print(f"{team} ranked: {week[str(currWeek)][2]} vs FA team: {faTeam} ranked: {defFree[faTeam]["posRank"]}")
+                    print(f"{team} ranked: {week[str(currentWeek)][2]} vs FA team: {faTeam} ranked: {defFree[faTeam]["posRank"]}")
                     print(f"")
             ### need to finish. stopped at able to see def fa left and their rank and opp rank
 
         elif choice == "8":
-            players = json_util.loadDataFromJson(playersJson)
 
-            # experiment - calc 'real' def rank, maybe this could lead to more 
-            if not allTeamStats:
-                print("No data has been loaded yet. Load data and try again.")
-                continue
-            print("Generate Best Available FA (WIP algo)")
-            print("Available Positions: QB, RB, WR, TE, K, DEF")
-            validInput = False
-            while validInput == False:
-                posInput = input("\nSelect a Position: ")
-                if posInput == "DEF":
-                    pos = "D/ST"
-                else: pos = posInput
-                if pos in constants.POSITIONS:
-                    validInput = True
-                else: print("Invalid position selected. Try again.")
-            stats = {}
-
-            # find best def pts allowed ranks
-            ptsByWeek = espn_data.getPtsByWeek(pos, allTeamStats, option="allowed")
-            ptsByWeek = espn_data.addRunningRanks(ptsByWeek)
-            currRanks = espn_data.getCurrentRanks(ptsByWeek)
-            # get stats of team points scored per game and their avg and their opp
-            playersList = {}
-            for p in players:
-                if ((p["position"] == pos and p["proTeam"] != "None" and p["onTeamId"] == 0)
-                    or 
-                    (p["position"] == pos and p["onTeamId"] == 1)):
-                    # print(p["name"])
-                    teamName = p["proTeam"]
-                    playerName = p["name"]
-                    playerStats = {
-                        "name":playerName,
-                        "ptsScored":[],
-                        "opp":[],
-                        "ptDiff":[],
-                        "ptScoredMinusOppAvg":[]
-                    }
-
-                    ptDiffTotal = 0
-                    ptTotal = 0
-                    oppAllowedAvgTotal = 0
-                    # ratio player's avg pts scored/player's team's pts scored
-                    if ("0" not in p["stats"]): continue
-                    ptsScoredTeamRatio = p["stats"]["0"]["avg_points"] / allTeamStats[p["proTeam"]]["averages"]["scored"][pos]
-                    for i in range(1,len(p["stats"])):
-                        if str(i) in p["stats"]:
-                            playerStats["ptsScored"].append(p["stats"][str(i)]["points"])
-                            playerStats["opp"].append(p["schedule"][str(i)]["team"])
-                            playerScored = p["stats"][str(i)]["points"]
-                            ptTotal += playerScored
-                            opp = p["schedule"][str(i)]["team"]
-                            oppAllowed = allTeamStats[opp]["weeks"][str(i)]["allowed"][pos]
-                            oppAllowedAvg = allTeamStats[opp]["averages"]["allowed"][pos]
-                            oppAllowedAvgTotal += oppAllowedAvg
-
-                            # match pos:
-                            #     case "RB": normalizeAllowedAvg = 2
-                            #     case "TE": normalizeAllowedAvg = 2
-                            #     case "WR": normalizeAllowedAvg = 4
-                            #     case _: normalizeAllowedAvg = 1
-
-                            # oppAllowedAvg = oppAllowedAvg/normalizeAllowedAvg
-                            oppAllowedAvg = oppAllowedAvg * ptsScoredTeamRatio
-                            playerStats["ptScoredMinusOppAvg"].append(playerScored-oppAllowedAvg)
-                            ptDiffTotal += (playerScored-oppAllowedAvg)
-                        else: continue
-
-                    if ptTotal == 0:
-                        continue
-                                                
-                        # cant we calc everything here? calc points diff, we have he opp,
-                        # maybe we can look up how many pts they allowed here every week? in allTeamStats?
-
-                    playerStats["average"] = p["stats"]["0"]["avg_points"]
-                    try:
-                        playerStats["ptDiffAverage"] = ptDiffTotal / (len(p["stats"]) - 1)
-                        playerStats["ptDiffAvgByPct"] = ptDiffTotal / (oppAllowedAvgTotal / (len(p["stats"]) - 1))
-                    except ZeroDivisionError:
-                        playerStats["ptDiffAverage"] = 0
-
-                    # now find curr opp avg pts allowed
-                    currWeek = getCurrentWeek(allTeamStats)
-                    currOpp = nflSchedule[teamName]["games"][(currWeek-1)] # -1 because python is 0 based
-                    # handle bye week
-                    if (currOpp == "BYE"): continue
-                    playerStats["currOpp"] = currOpp
-                    playerStats["currOppRank"] = allTeamStats[currOpp]["averages"]["allowed"]
-                    currOppAvgAllowed = allTeamStats[currOpp]["averages"]["allowed"][pos]
-
-                    playerStats["weightedScore1"] = playerStats["average"]*0.5 + playerStats["ptDiffAverage"]*0.25 + currOppAvgAllowed*ptsScoredTeamRatio*0.25
-                    playerStats["weightedScore2"] = playerStats["average"]*0.5 + currOppAvgAllowed*ptsScoredTeamRatio*0.5*playerStats["ptDiffAvgByPct"]
-
-                    # print(f"{teamName}: weightedScore = {teamStats["weightedScore"]}")
-                    playersList[playerName] = playerStats
-
-            playersSortedWS1 = {}
-            playersSortedWS2 = {}
-            ptThreshold1 = 5
-            ptThreshold2 = 3
-            for player, stats in sorted(playersList.items()):
-                if stats["weightedScore1"] > ptThreshold1 :
-                    playersSortedWS1[player] = round(stats["weightedScore1"], 1)
-                if stats["weightedScore2"] > ptThreshold2 :
-                    playersSortedWS2[player] = round(stats["weightedScore2"], 1)
-
-            dataWS1 = {
-                "name": [],
-                "ws1": [],
-                "opp": [],
-                "rank" : []
-            }
-            dataWS2 = {
-                "name": [],
-                "ws1": [],
-                "opp": [],
-                "rank" : []
-            }
-
-            print("Top Players based on WS1")
-            for player, score in sorted(playersSortedWS1.items(), key=lambda x: x[1], reverse=True):
-                dataWS1["name"].append(player)
-                dataWS1["ws1"].append(score)
-                dataWS1["opp"].append(playersList[player]["currOpp"])
-                dataWS1["rank"].append(currRanks[playersList[player]["currOpp"]])
-
-            df = pd.DataFrame(dataWS1)
-            print(df)
-
-            print("\nTop Players based on WS2")
-            for player, score in sorted(playersSortedWS2.items(), key=lambda x: x[1], reverse=True):
-                dataWS2["name"].append(player)
-                dataWS2["ws1"].append(score)
-                dataWS2["opp"].append(playersList[player]["currOpp"])
-                dataWS2["rank"].append(currRanks[playersList[player]["currOpp"]])
-
-            df = pd.DataFrame(dataWS2)
-            print(df)
+            analyzer.rankFAandMyTeamPlayerVsCurrOppWIP(allTeamStats, players, nflSchedule, currentWeek)
+            
 
         elif choice == "9":
             print("Goodbye!")
@@ -403,6 +293,47 @@ def main():
         else:
             print("Invalid option. Try again.")
 
+################################################################################################
+################################################################################################
+################################################################################################
+
+# helper functions
+def getPtsType():
+
+    print("Allowed = 1\nScored = 2")
+    validInput = False
+    while validInput == False:
+        option = input("\nSelect an option: ")
+        if option == str(1):
+            optionStr = "allowed"
+            validInput = True
+        elif option == str(2):
+            optionStr = "scored"
+            validInput = True
+        else: print("Invalid position selected. Try again.")
+
+    return optionStr
+
+def getPosInput():
+    
+    print("Available Positions: QB, RB, WR, TE, K, DEF")
+    validInput = False
+    while validInput == False:
+        pos = input("\nSelect a Position: ")
+        if pos == "DEF":
+            posTag = "D/ST"
+        else: posTag = pos
+        if posTag in constants.POSITIONS:
+            validInput = True
+        else: print("Invalid position selected. Try again.")
+
+    return posTag
+
+def checkLoadedData(allTeamStats):
+    if not allTeamStats:
+        print("No data has been loaded yet. Load data and try again.")
+        return False
+    return True
 
 if __name__ == "__main__":
     main()
