@@ -358,6 +358,7 @@ def main():
                 print(f"\nSelected {p.name}")
                 print("(1) Points for specfic week")
                 print("(2) Avg points")
+                print("(3) Projections for future games")
                 opt = input("Option: ")
 
                 if opt == "1":
