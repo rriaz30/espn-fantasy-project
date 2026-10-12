@@ -47,11 +47,18 @@ def interpolateColor(startColor, endColor, percent):
 def addFilter(ws):
     # Add filters to every column
     for row in ws.iter_rows():
-        if any(cell.value == "Rank" for cell in row):
+        if any("Rank" in str(cell.value) for cell in row):
+            headerRow = row[0].row
+
+            # Add filters
             ws.auto_filter.ref = (
-                f"A{row[0].row}:"
+                f"A{headerRow}:"
                 f"{ws.cell(ws.max_row, ws.max_column).coordinate}"
             )
+
+            # Freeze header row and all rows above it
+            ws.freeze_panes = f"A{headerRow + 1}"
+
             break
 
 
@@ -206,7 +213,6 @@ def writePositionSheet(writer, df, pos, title):
     ws.delete_rows(4)
     ws["A2"] = "Team"
     writeTitle(ws, title)
-    ws.freeze_panes = "B4"
 
     addFilter(ws)    
 
@@ -229,49 +235,54 @@ def colorRankings(filePath):
     # Loop through every worksheet
     for ws in wb.worksheets:
 
-        # Find every column with a Rank header
-        for cell in ws[3]:
+        # Find row containing "Rank"
+        for row in ws.iter_rows():
+            if any("Rank" in str(cell.value) for cell in row):
+                rankRow = row[0].row + 1
 
-            if cell.value == "Running Avg":
-                cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+                # Find every column with a Rank header
+                for cell in row:
+
+                    if cell.value == "Running Avg":
+                        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+                        
+                    # if cell.value != "Rank":
+                    if "Rank" not in str(cell.value):
+                        continue
+
+                    rankCol = cell.column
+
+                    # Color each rank in that column
+                    for row in range(rankRow, ws.max_row + 1):
+                            
+                        rankCell = ws.cell(row=row, column=rankCol)
+                        rank = rankCell.value
+
+                        if not isinstance(rank, (int, float)):
+                            continue
+
+                        rank = int(rank)
+
+                        if 1 <= rank <= 10:
+                            color = greenColors[rank - 1]
+
+                        elif 22 <= rank <= 32:
+                            color = redColors[rank - 22]
+
+                        else:
+                            continue
+
+                        if 1 <= rank <=3 or 30 <= rank <= 32:
+                            rankCell.font = Font(
+                                bold=True,
+                                color="FFFFFF"
+                        )
+
+                        rankCell.fill = PatternFill(
+                            fill_type="solid",
+                            fgColor=color
+                        )
                 
-            if cell.value != "Rank":
-                continue
-
-            rankCol = cell.column
-
-            # Color each rank in that column
-            for row in range(4, ws.max_row + 1):
-                    
-                rankCell = ws.cell(row=row, column=rankCol)
-                rank = rankCell.value
-
-                if not isinstance(rank, (int, float)):
-                    continue
-
-                rank = int(rank)
-
-                if 1 <= rank <= 10:
-                    color = greenColors[rank - 1]
-
-                elif 22 <= rank <= 32:
-                    color = redColors[rank - 22]
-
-                else:
-                    continue
-
-                if 1 <= rank <=3 or 30 <= rank <= 32:
-                    rankCell.font = Font(
-                        bold=True,
-                        color="FFFFFF"
-                )
-
-                rankCell.fill = PatternFill(
-                    fill_type="solid",
-                    fgColor=color
-                )
-
-
 
     wb.save(filePath)
 
@@ -306,7 +317,13 @@ def scheduleToExcel(schedule, filePath, currentWeek):
     games = {}
 
     for team in schedule:
-        games[team] = schedule[team]["games"]
+        listOfOpp = []
+        for i in range(len(schedule[team]["games"])):
+            if schedule[team]["location"][i] == "AWAY":
+                listOfOpp.append(schedule[team]["games"][i] + "*")
+            else: listOfOpp.append(schedule[team]["games"][i])
+        
+        games[team] = listOfOpp
 
     df = pd.DataFrame.from_dict(
         games,
@@ -346,6 +363,7 @@ def colorScheduleByPosition(schedule, filePath, pos, currentWeek):
 
             cell = ws.cell(row=row, column=col)
             opponent = cell.value
+            opponent = opponent.replace("*","")
 
             if opponent == "BYE":
                 continue
@@ -426,6 +444,82 @@ def formatScheduleSheet(ws: Worksheet, currentWeek):
                 left=thick,
                 right=thick
             )
+
+def printWeightedScoresToExcel(playersList, currRanks, filePath, ptThreshold=0):
+
+    scoreTypes = [
+        "weightedScore1",
+        "weightedScore2",
+        "weightedScore3"
+    ]
+
+    with pd.ExcelWriter(filePath, engine="openpyxl") as writer:
+
+        for scoreType in scoreTypes:
+
+            # Sort players by weighted score (highest first)
+            sortedPlayers = sorted(
+                playersList.items(),
+                key=lambda x: x[1][scoreType],
+                reverse=True
+            )
+
+            data = []
+
+            for playerName, stats in sortedPlayers:
+
+                score = stats[scoreType]
+
+                if score <= ptThreshold:
+                    continue
+
+                opp = stats["currOpp"]
+
+                data.append({
+                    "Player Name": playerName,
+                    "Weighted Score": round(score, 1),
+                    "Opp": opp,
+                    "Opp Rank": currRanks[opp]
+                })
+
+            df = pd.DataFrame(
+                data,
+                columns=["Player Name", "Weighted Score", "Opp", "Opp Rank"]
+            )
+
+            # Add ranking column
+            df.insert(0, "Rank", range(1, len(df) + 1))
+
+            # Write to separate worksheet
+            sheetName = scoreType.replace("weightedScore", "WS")
+            df.to_excel(
+                writer,
+                sheet_name=sheetName,
+                index=False
+            )
+
+            ws = writer.sheets[sheetName]
+
+            # Add Excel filters
+            ws.auto_filter.ref = ws.dimensions
+
+            # Freeze header row
+            ws.freeze_panes = "A2"
+
+            # Adjust column widths
+            for col in ws.columns:
+                maxLength = max(
+                    len(str(cell.value))
+                    if cell.value is not None else 0
+                    for cell in col
+                )
+
+                ws.column_dimensions[col[0].column_letter].width = maxLength + 2
+
+            formatCells(ws)
+
+    colorRankings(filePath)
+    print(f"Weighted Score report saved to {filePath}")
 
 def closeExcelFile(filePath):
 

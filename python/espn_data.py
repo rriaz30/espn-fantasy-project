@@ -65,19 +65,26 @@ def fetchNflData(league_id, year, espn_s2, swid, nflSchedule, players, fantasyTe
 
         teamSched = pro_schedule[teamKey]
         listOfOpp = []
+        listOfLoc = []
         for i in range(1, 19):
             weekNumber = str(i)
             try:
                 game = teamSched[str(i)][0]
                 if game["awayProTeamId"] == teamKey:
                     opp = game["homeProTeamId"]
-                else: opp = game["awayProTeamId"]
+                    location = "AWAY"
+                else: 
+                    opp = game["awayProTeamId"]
+                    location = "HOME"
                 oppName = PRO_TEAM_MAP[opp]
             except:
                 oppName = 'BYE'
+                location = "HOME"
             listOfOpp.append(oppName)
+            listOfLoc.append(location)
 
         nflSchedule[team]["games"] = listOfOpp
+        nflSchedule[team]["location"] = listOfLoc
 
     print("\nTeam data loaded succesfully")
 

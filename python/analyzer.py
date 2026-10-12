@@ -2,6 +2,7 @@
 import espn_data
 import constants
 import pandas as pd
+import statistics
 
 def rankFAandMyTeamPlayerVsCurrOppWIP(allTeamStats, players, nflSchedule, currentWeek):
     # experiment - calc 'real' def rank, maybe this could lead to more 
@@ -16,13 +17,15 @@ def rankFAandMyTeamPlayerVsCurrOppWIP(allTeamStats, players, nflSchedule, curren
         if pos in constants.POSITIONS:
             validInput = True
         else: print("Invalid position selected. Try again.")
-    stats = {}
 
-    # find best def pts allowed ranks
+    ptThreshold = input("Enter Point Threshold: ")
+    ptThreshold = int(ptThreshold)
+
+    # find best pts allowed ranks
     ptsByWeek = espn_data.getPtsByWeek(pos, allTeamStats, option="allowed")
     ptsByWeek = espn_data.addRunningRanks(ptsByWeek)
     currRanks = espn_data.getCurrentRanks(ptsByWeek)
-    # get stats of team points scored per game and their avg and their opp
+    # get stats of player points scored per game and their avg and their curr opp
     playersList = {}
     for p in players:
         if ((p["position"] == pos and p["proTeam"] != "None" and p["onTeamId"] == 0)
@@ -42,7 +45,7 @@ def rankFAandMyTeamPlayerVsCurrOppWIP(allTeamStats, players, nflSchedule, curren
             ptDiffTotal = 0
             ptTotal = 0
             oppAllowedAvgTotal = 0
-            # ratio player's avg pts scored/player's team's pts scored
+            # ptsScoredTeamRatio = player's avg pts scored/player's team's pts scored
             if ("0" not in p["stats"]): continue
             ptsScoredTeamRatio = p["stats"]["0"]["avg_points"] / allTeamStats[p["proTeam"]]["averages"]["scored"][pos]
             for i in range(1,len(p["stats"])):
@@ -55,14 +58,6 @@ def rankFAandMyTeamPlayerVsCurrOppWIP(allTeamStats, players, nflSchedule, curren
                     oppAllowed = allTeamStats[opp]["weeks"][str(i)]["allowed"][pos]
                     oppAllowedAvg = allTeamStats[opp]["averages"]["allowed"][pos]
                     oppAllowedAvgTotal += oppAllowedAvg
-
-                    # match pos:
-                    #     case "RB": normalizeAllowedAvg = 2
-                    #     case "TE": normalizeAllowedAvg = 2
-                    #     case "WR": normalizeAllowedAvg = 4
-                    #     case _: normalizeAllowedAvg = 1
-
-                    # oppAllowedAvg = oppAllowedAvg/normalizeAllowedAvg
                     oppAllowedAvg = oppAllowedAvg * ptsScoredTeamRatio
                     playerStats["ptScoredMinusOppAvg"].append(playerScored-oppAllowedAvg)
                     ptDiffTotal += (playerScored-oppAllowedAvg)
@@ -70,11 +65,13 @@ def rankFAandMyTeamPlayerVsCurrOppWIP(allTeamStats, players, nflSchedule, curren
 
             if ptTotal == 0:
                 continue
-                                        
-                # cant we calc everything here? calc points diff, we have he opp,
-                # maybe we can look up how many pts they allowed here every week? in allTeamStats?
-
-            playerStats["average"] = p["stats"]["0"]["avg_points"]
+                        
+            playerStats["median"] = statistics.median(playerStats["ptsScored"])
+            playerStats["average"] = statistics.mean(playerStats["ptsScored"])
+            # if p["name"] == "Broncos D/ST":
+            #     print("median = " , playerStats["median"])
+            #     print("avg from stats, " , playerStats["average"])
+            #     print("avg calc", statistics.mean(playerStats["ptsScored"]))
             try:
                 playerStats["ptDiffAverage"] = ptDiffTotal / (len(p["stats"]) - 1)
                 playerStats["ptDiffAvgByPct"] = ptDiffTotal / (oppAllowedAvgTotal / (len(p["stats"]) - 1))
@@ -89,51 +86,31 @@ def rankFAandMyTeamPlayerVsCurrOppWIP(allTeamStats, players, nflSchedule, curren
             playerStats["currOppRank"] = allTeamStats[currOpp]["averages"]["allowed"]
             currOppAvgAllowed = allTeamStats[currOpp]["averages"]["allowed"][pos]
 
-            playerStats["weightedScore1"] = playerStats["average"]*0.5 + playerStats["ptDiffAverage"]*0.25 + currOppAvgAllowed*ptsScoredTeamRatio*0.25
-            playerStats["weightedScore2"] = playerStats["average"]*0.5 + currOppAvgAllowed*ptsScoredTeamRatio*0.5*(1+playerStats["ptDiffAvgByPct"])
+            playerStats["weightedScore1"] = (
+                playerStats["average"] * 0.5
+                + playerStats["ptDiffAverage"] * 0.25
+                + currOppAvgAllowed * ptsScoredTeamRatio * 0.25
+            )
+            playerStats["weightedScore2"] = (
+                playerStats["average"] * 0.5
+                + currOppAvgAllowed * ptsScoredTeamRatio * 0.5 * (1 + playerStats["ptDiffAvgByPct"])
+            )
+            medianMeanBlend = (
+                playerStats["average"] * 0.5
+                + playerStats["median"] * 0.5
+            )
+            playerStats["weightedScore3"] = (
+                medianMeanBlend * 0.5
+                + currOppAvgAllowed * ptsScoredTeamRatio * 0.5 * (1 + playerStats["ptDiffAvgByPct"])
+            )
+
+            # if p["name"] == "Broncos D/ST":
+            #     print("curr opp all avg = " , currOppAvgAllowed)
+            #     print("player ptDiffAvgByPct, " , playerStats["ptDiffAvgByPct"])
+            #     print("player avg", playerStats["average"])
+            #     print("player ptsTeamRatio", ptsScoredTeamRatio)
 
             # print(f"{teamName}: weightedScore = {teamStats["weightedScore"]}")
             playersList[playerName] = playerStats
 
-    playersSortedWS1 = {}
-    playersSortedWS2 = {}
-    ptThreshold1 = 5
-    ptThreshold2 = 3
-    for player, stats in sorted(playersList.items()):
-        if stats["weightedScore1"] > ptThreshold1 :
-            playersSortedWS1[player] = round(stats["weightedScore1"], 1)
-        if stats["weightedScore2"] > ptThreshold2 :
-            playersSortedWS2[player] = round(stats["weightedScore2"], 1)
-
-    dataWS1 = {
-        "name": [],
-        "ws1": [],
-        "opp": [],
-        "rank" : []
-    }
-    dataWS2 = {
-        "name": [],
-        "ws1": [],
-        "opp": [],
-        "rank" : []
-    }
-
-    print("Top Players based on WS1")
-    for player, score in sorted(playersSortedWS1.items(), key=lambda x: x[1], reverse=True):
-        dataWS1["name"].append(player)
-        dataWS1["ws1"].append(score)
-        dataWS1["opp"].append(playersList[player]["currOpp"])
-        dataWS1["rank"].append(currRanks[playersList[player]["currOpp"]])
-
-    df = pd.DataFrame(dataWS1)
-    print(df)
-
-    print("\nTop Players based on WS2")
-    for player, score in sorted(playersSortedWS2.items(), key=lambda x: x[1], reverse=True):
-        dataWS2["name"].append(player)
-        dataWS2["ws1"].append(score)
-        dataWS2["opp"].append(playersList[player]["currOpp"])
-        dataWS2["rank"].append(currRanks[playersList[player]["currOpp"]])
-
-    df = pd.DataFrame(dataWS2)
-    print(df)   
+    return playersList, currRanks, ptThreshold, posInput
