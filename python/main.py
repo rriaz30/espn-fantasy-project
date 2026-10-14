@@ -9,6 +9,7 @@ import espn_data
 import constants
 import excel_util
 import player
+import proTeam
 import json_util
 import pandas as pd
 
@@ -20,7 +21,7 @@ year = int(os.environ["ESPN_YEAR"])
 espn_s2 = os.environ["ESPN_S2"]
 swid = os.environ["ESPN_SWID"]
 
-# Assuming this script is in ESPN_API/python/
+# output dir loc
 projectDir = Path(__file__).resolve().parent.parent
 outputDir = projectDir / "output"
 outputDir.mkdir(parents=True, exist_ok=True)
@@ -37,6 +38,7 @@ allTeamStats = {}
 nflSchedule = {}
 players = []
 fantasyTeams = {}
+proTeams = {}
 
 # init global var
 currentWeek = 0
@@ -230,28 +232,32 @@ def schedulesMenu():
 ################################################################################################
 
 def main():
-    global allTeamStats, nflSchedule, players, fantasyTeams, currentWeek
+    global allTeamStats, nflSchedule, players, fantasyTeams, currentWeek, proTeams
 
     print("Checking for saved data")
     allTeamStats, nflSchedule, players, fantasyTeams = loadJsonData()
 
+    # check if data has been loaded
+    dataValid = checkLoadedData(allTeamStats)
+    if (dataValid == False):
+        while dataValid == False:
+            print("No Data loaded. Either fetch ESPN data(1) or load from Json file(2)")
+            dataInput = input("Select an option:")
+            if dataInput == "1":
+                fetchESPNdata()
+            elif dataInput == "2":
+                print("Loading saved data...")
+                allTeamStats, nflSchedule, players, fantasyTeams = loadJsonData()
+            else: print("Invalid position selected. Try again.")
+            dataValid = checkLoadedData(allTeamStats)
+
+    for team in constants.NFL_TEAMS:
+        proTeams[team] = proTeam.ProTeam(allTeamStats[team])
+
     print("Current Week:", currentWeek + 1)
     print("Data based off week:", currentWeek)
-
-    # check if data has been loaded
+    
     while True:
-        dataValid = checkLoadedData(allTeamStats)
-        if (dataValid == False):
-            while dataValid == False:
-                print("No Data loaded. Either fetch ESPN data(1) or load from Json file(2)")
-                dataInput = input("Select an option:")
-                if dataInput == "1":
-                    fetchESPNdata()
-                elif dataInput == "2":
-                    print("Loading saved data...")
-                    allTeamStats, nflSchedule, players, fantasyTeams = loadJsonData()
-                else: print("Invalid position selected. Try again.")
-                dataValid = checkLoadedData(allTeamStats)
 
         # data exists, enter main loop
         print("\n===== ESPN Fantasy Analyzer =====")
@@ -350,15 +356,20 @@ def main():
                     print(f"({index}) {playerData["name"]}: \t{accuracy:.1%}")  
                     index += 1
 
-            pick = input("\nSelect a player by index: ")  
+            pick = input("\nSelect a player by index: ")
+            if not pick: continue  
 
             p = player.Player(matchList[int(pick)-1][0])
+            playersTeam = p.getProTeam()
+            print("players team: ", playersTeam)
+            t = proTeam.ProTeam(allTeamStats[playersTeam])
             
             while True:
                 print(f"\nSelected {p.name}")
                 print("(1) Points for specfic week")
                 print("(2) Avg points")
                 print("(3) Projections for future games")
+                print("(4) Future Opp Matchups")
                 opt = input("Option: ")
 
                 if opt == "1":
@@ -374,6 +385,16 @@ def main():
                     
                     print(f"Avg points from weeks {start} to {end}: {avgPts}")
                     print(f"Played in {played} games")
+
+                elif opt == "4":
+                    print("\nNext 3 Opponents")
+                    print(f"Team\tPoints Allowed to {p.pos}\tRank")
+                    for i in range(currentWeek+1, currentWeek+1+3):
+                        oppTeam = p.getOppByWeek(i)
+                        if oppTeam == "BYE":
+                            print(f"{oppTeam}")
+                        else:
+                            print(f"{oppTeam}\t{proTeams[oppTeam].getAverage("allowed",p.pos)}")
 
                 elif opt == "9": break
 

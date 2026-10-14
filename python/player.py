@@ -12,6 +12,9 @@ class Player(object):
         self.stats = stats["stats"]
         self.schedule = stats["schedule"]
 
+    def getProTeam(self):
+        return self.proTeam
+
     def getPtsForWeek(self, week):
         return self.stats.get(str(week), {}).get("points", 0)
 
@@ -27,4 +30,4 @@ class Player(object):
         return round(totalPts/gamesPlayed, 1), gamesPlayed
 
     def getOppByWeek(self, week):
-        return self.schedule.get(str(week), {}).get("team", "")
+        return self.schedule.get(str(week), {}).get("team", "BYE")

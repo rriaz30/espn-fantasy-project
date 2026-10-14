@@ -30,7 +30,8 @@ def rankFAandMyTeamPlayerVsCurrOppWIP(allTeamStats, players, nflSchedule, curren
     for p in players:
         if ((p["position"] == pos and p["proTeam"] != "None" and p["onTeamId"] == 0)
             or 
-            (p["position"] == pos and p["onTeamId"] == 1)):
+            (p["position"] == pos and p["onTeamId"] == 1)): # The RFL
+            # (p["position"] == pos and p["onTeamId"] == 11)): # The Tommy Foundation
             # print(p["name"])
             teamName = p["proTeam"]
             playerName = p["name"]
@@ -47,7 +48,10 @@ def rankFAandMyTeamPlayerVsCurrOppWIP(allTeamStats, players, nflSchedule, curren
             oppAllowedAvgTotal = 0
             # ptsScoredTeamRatio = player's avg pts scored/player's team's pts scored
             if ("0" not in p["stats"]): continue
-            ptsScoredTeamRatio = p["stats"]["0"]["avg_points"] / allTeamStats[p["proTeam"]]["averages"]["scored"][pos]
+            try:
+                ptsScoredTeamRatio = p["stats"]["0"]["avg_points"] / allTeamStats[p["proTeam"]]["averages"]["scored"][pos]
+            except:
+                ptsScoredTeamRatio = 0
             for i in range(1,len(p["stats"])):
                 if str(i) in p["stats"]:
                     playerStats["ptsScored"].append(p["stats"][str(i)]["points"])
