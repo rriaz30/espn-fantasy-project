@@ -65,7 +65,7 @@ def rankFAandMyTeamPlayerVsCurrOppWIP(allTeamStats, players, nflSchedule, curren
             except:
                 ptsScoredTeamRatio = 0
 
-            print("len(p[\"stats\"]) = " , len(p["stats"]))
+            # print("len(p[\"stats\"]) = " , len(p["stats"]))
 
             if trailingWeeks == 0:
                 startWeek = 1
