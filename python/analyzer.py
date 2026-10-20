@@ -3,9 +3,14 @@ import espn_data
 import constants
 import pandas as pd
 import statistics
+from player import Player
+from proTeam import ProTeam
+import config
 
 def rankFAandMyTeamPlayerVsCurrOppWIP(allTeamStats, players, nflSchedule, currentWeek):
     # experiment - calc 'real' def rank, maybe this could lead to more 
+    print("currWeek = " , currentWeek)
+    print("config.currWeek = " , config.currentWeek)
     print("Generate Best Available FA (WIP algo)")
     print("Available Positions: QB, RB, WR, TE, K, DEF")
     validInput = False
@@ -17,6 +22,13 @@ def rankFAandMyTeamPlayerVsCurrOppWIP(allTeamStats, players, nflSchedule, curren
         if pos in constants.POSITIONS:
             validInput = True
         else: print("Invalid position selected. Try again.")
+
+    trailingWeeks = input("Enter Trailing Weeks: ")
+    if (trailingWeeks == ""):
+        trailingWeeks = 0
+    else:
+        trailingWeeks = int(trailingWeeks)
+    print("trailingWeeks = ", trailingWeeks)
 
     ptThreshold = input("Enter Point Threshold: ")
     ptThreshold = int(ptThreshold)
@@ -52,7 +64,16 @@ def rankFAandMyTeamPlayerVsCurrOppWIP(allTeamStats, players, nflSchedule, curren
                 ptsScoredTeamRatio = p["stats"]["0"]["avg_points"] / allTeamStats[p["proTeam"]]["averages"]["scored"][pos]
             except:
                 ptsScoredTeamRatio = 0
-            for i in range(1,len(p["stats"])):
+
+            print("len(p[\"stats\"]) = " , len(p["stats"]))
+
+            if trailingWeeks == 0:
+                startWeek = 1
+            else:
+                startWeek = len(p["stats"]) - trailingWeeks
+            if startWeek <= 0:
+                continue
+            for i in range(startWeek, len(p["stats"])):
                 if str(i) in p["stats"]:
                     playerStats["ptsScored"].append(p["stats"][str(i)]["points"])
                     playerStats["opp"].append(p["schedule"][str(i)]["team"])
@@ -118,3 +139,16 @@ def rankFAandMyTeamPlayerVsCurrOppWIP(allTeamStats, players, nflSchedule, curren
             playersList[playerName] = playerStats
 
     return playersList, currRanks, ptThreshold, posInput
+
+def getProjPtsVsFutureOpp(p: Player, opp: str, week, proTeams):
+    print(f"Get proj points for {p.getName()} vs {opp} in week {week}")
+    print("Using WS3")
+
+    # find ptsScoredTeamRatio
+    playerAvgPts = p.getAvgPts()
+    playersTeamAvg = proTeams[p.getProTeam].getAverage("scored", p.pos)
+    ptsScoredTeamRatio = playerAvgPts / playersTeamAvg
+
+
+
+

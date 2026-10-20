@@ -52,6 +52,7 @@ def fetchNflData(league_id, year, espn_s2, swid, nflSchedule, players, fantasyTe
         print("Loading team data for", team)
         stats = getPtsAllowedStats(league, players, team)
         allTeamStats[team] = stats
+        allTeamStats[team]["name"] = team
 
     print("\nBuilding NFL Teams Schedule")
     pro_schedule = league._get_all_pro_schedule()

@@ -4,10 +4,14 @@ class ProTeam(object):
 
     def __init__(self, stats):
 
+        self.name = stats["name"]
         self.weeks = stats["weeks"]
         self.totals = stats["totals"]
         self.averages = stats["averages"]
         self.gamesPlayed = stats["gamesPlayed"]
+
+    def getTeamName(self):
+         return self.name
 
     def getWeekStats(self, week):
         return self.weeks.get(str(week), {})

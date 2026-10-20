@@ -1,4 +1,4 @@
-
+import config
 
 class Player(object):
 
@@ -12,13 +12,16 @@ class Player(object):
         self.stats = stats["stats"]
         self.schedule = stats["schedule"]
 
+    def getName(self):
+        return self.name
+
     def getProTeam(self):
         return self.proTeam
 
     def getPtsForWeek(self, week):
         return self.stats.get(str(week), {}).get("points", 0)
 
-    def getAvgPts(self, start, end):
+    def getAvgPts(self, start = 1, end = config.currentWeek):
 
         totalPts = 0
         gamesPlayed = 0

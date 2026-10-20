@@ -7,6 +7,7 @@ from dotenv import load_dotenv
 import analyzer
 import espn_data
 import constants
+import config
 import excel_util
 import player
 import proTeam
@@ -92,6 +93,7 @@ def loadJsonData():
 
         global currentWeek
         currentWeek = len(allTeamStats['ARI']['weeks']) - 1
+        config.currentWeek = currentWeek
 
         return allTeamStats, nflSchedule, players, fantasyTeams
     except:
@@ -119,6 +121,7 @@ def fetchESPNdata():
 
     global currentWeek
     currentWeek = len(allTeamStats['ARI']['weeks']) - 1
+    config.currentWeek = currentWeek
 
 def generateReportsMenu():
     while True:
