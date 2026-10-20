@@ -194,7 +194,7 @@ def getPtsAllowedStats(league: League, players: list, team: str):
         weekNumber = str(i)
         # check if week is a bye week
         if ((str(i)) not in teamSched):
-            stats["weeks"]["5"] = {
+            stats["weeks"][str(i)] = {
                 "opp": "BYE",
                 "played": 0,
                 "allowed": {
