@@ -1,1 +1,2 @@
-currentWeek = None
+currDataWeek = None
+currLiveWeek = None

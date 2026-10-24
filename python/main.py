@@ -13,6 +13,12 @@ import player
 import proTeam
 import json_util
 import pandas as pd
+import logging
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(filename)s:%(lineno)d - %(funcName)s - %(levelname)s - %(message)s"
+)
 
 # Load .env from the same directory as main.py
 load_dotenv(Path(__file__).resolve().parent.parent / ".env")
@@ -40,9 +46,6 @@ nflSchedule = {}
 players = []
 fantasyTeams = {}
 proTeams = {}
-
-# init global var
-currentWeek = 0
 
 def clearConsole():
     os.system("cls")
@@ -78,7 +81,7 @@ def getPosRanks(allTeamStats, nflSchedule, option):
             ptsByWeek = espn_data.getPtsByWeek(pos, allTeamStats, option)
             ptsByWeek = espn_data.addRunningRanks(ptsByWeek)
 
-            nflSchedule[team]["ranks"][pos] = ptsByWeek[team][str(currentWeek)][2]
+            nflSchedule[team]["ranks"][pos] = ptsByWeek[team][str(config.currDataWeek)][2]
 
 def loadJsonData():
     
@@ -91,9 +94,8 @@ def loadJsonData():
         if allTeamStats:
             print("Data loaded successfully")
 
-        global currentWeek
-        currentWeek = len(allTeamStats['ARI']['weeks']) - 1
-        config.currentWeek = currentWeek
+        config.currDataWeek = len(allTeamStats['ARI']['weeks'])
+        config.currLiveWeek = config.currDataWeek + 1
 
         return allTeamStats, nflSchedule, players, fantasyTeams
     except:
@@ -102,7 +104,7 @@ def loadJsonData():
 
 def fetchESPNdata():
 
-    global allTeamStats, nflSchedule, players, fantasyTeams, currentWeek
+    global allTeamStats, nflSchedule, players, fantasyTeams
 
     print("Fetching ESPN data...")
     # first reset data structs
@@ -118,10 +120,6 @@ def fetchESPNdata():
     json_util.saveDataToJson(nflSchedule, dataDir / scheduleJson)
     json_util.saveDataToJson(players, dataDir / playersJson)
     json_util.saveDataToJson(fantasyTeams, dataDir / fantasyTeamsJson)
-
-    global currentWeek
-    currentWeek = len(allTeamStats['ARI']['weeks']) - 1
-    config.currentWeek = currentWeek
 
 def generateReportsMenu():
     while True:
@@ -160,7 +158,7 @@ def generateReportsMenu():
 
         elif choice == "3":
             print("Generate Weekly Points Report for Allowed or Scored filtered for most recent weeks")
-            weeksReq = input("Enter how many past weeks of data you want to filter for:")
+            weeksReq = input("Enter trailing weeks: ")
             if weeksReq == "b": continue
             weeksReq = int(weeksReq)
             optionStr = getPtsType()
@@ -180,7 +178,9 @@ def generateReportsMenu():
             print("Invalid option. Try again.")
 
 def schedulesMenu():
-    schedCurrWeek = currentWeek + 1 # have to adjust for current week to make it the actual week
+
+    schedCurrWeek = config.currLiveWeek
+
     while True:
 
         print("\n===== ESPN Fantasy Analyzer =====")
@@ -235,7 +235,7 @@ def schedulesMenu():
 ################################################################################################
 
 def main():
-    global allTeamStats, nflSchedule, players, fantasyTeams, currentWeek, proTeams
+    global allTeamStats, nflSchedule, players, fantasyTeams, proTeams
 
     print("Checking for saved data")
     allTeamStats, nflSchedule, players, fantasyTeams = loadJsonData()
@@ -257,8 +257,8 @@ def main():
     for team in constants.NFL_TEAMS:
         proTeams[team] = proTeam.ProTeam(allTeamStats[team])
 
-    print("Current Week:", currentWeek + 1)
-    print("Data based off week:", currentWeek)
+    print("Current Week:", config.currLiveWeek)
+    print("Data based off week:", config.currDataWeek)
     
     while True:
 
@@ -269,11 +269,11 @@ def main():
         print("1. Fetch ESPN data")
         print("2. Generate Points/Rank Reports")
         print("3. Generate Schedules")
-        print(f"4. Get FA Available vs Bottom Opponents for week {currentWeek+1} WIP")
+        print("4. WIP - Team Analyzer - not started")
         print("5. Player Analyzer WIP")
         print("6. Player Search")
         print("9. Exit")
-        
+
         choice = input("\nSelect an option: ")
         clearConsole()
 
@@ -293,13 +293,47 @@ def main():
 
 
         elif choice == "5":
-            playersList, currRanks, ptThreshold, pos = analyzer.rankFAandMyTeamPlayerVsCurrOppWIP(allTeamStats, players, nflSchedule, currentWeek)
-            
-            excelFile = outputDir / f"WeightedScores-{pos}-week-{currentWeek+1}.xlsx"
+            # experiment - calc 'real' def rank, maybe this could lead to more 
+            print("Generate Best Available FA (WIP algo)")
+            print("Available Positions: QB, RB, WR, TE, K, DEF")
+            validInput = False
+            while validInput == False:
+                posInput = input("\nSelect a Position: ")
+                if posInput == "DEF":
+                    pos = "D/ST"
+                elif posInput == "b" or posInput == "9": break
+                else: pos = posInput
+                if pos in constants.POSITIONS:
+                    validInput = True
+                else: print("Invalid position selected. Try again.")
+
+            if posInput == "b" or posInput == "9": continue
+
+            trailingWeeks = input("Enter Trailing Weeks: ")
+            if (trailingWeeks == ""):
+                trailingWeeks = 0
+            else:
+                trailingWeeks = int(trailingWeeks)
+
+            futureWeek = input("Enter Future Week: ")
+            if (futureWeek == ""):
+                futureWeek = 0
+            else:
+                futureWeek = int(futureWeek)
+
+            ptThreshold = input("Enter Point Threshold: ")
+            if (ptThreshold == ""): ptThreshold = 0
+            ptThreshold = int(ptThreshold)
+
+            playersList = analyzer.getFAvsProjection(allTeamStats, players, nflSchedule, pos, trailingWeeks, futureWeek)
+
+            if trailingWeeks == 0:
+                excelFile = outputDir / f"WeightedScores-{pos}-week-{config.currLiveWeek}.xlsx"
+            else:
+                excelFile = outputDir / f"WeightedScores-{pos}-week-{config.currLiveWeek}-trailing-{trailingWeeks}.xlsx"
             excel_util.closeExcelFile(excelFile)
             excel_util.printWeightedScoresToExcel(
                 playersList,
-                currRanks,
                 excelFile,
                 ptThreshold
             )
@@ -383,7 +417,7 @@ def main():
                     start = input("\nEnter start week: ")
                     end = input("Enter end week: ")
                     if not start: start = 1
-                    if not end: end = currentWeek
+                    if not end: end = config.currDataWeek
                     avgPts, played = p.getAvgPts(int(start), int(end))
                     
                     print(f"Avg points from weeks {start} to {end}: {avgPts}")
@@ -392,7 +426,7 @@ def main():
                 elif opt == "4":
                     print("\nNext 3 Opponents")
                     print(f"Team\tPoints Allowed to {p.pos}\tRank")
-                    for i in range(currentWeek+1, currentWeek+1+3):
+                    for i in range(config.currLiveWeek, config.currLiveWeek+3):
                         oppTeam = p.getOppByWeek(i)
                         if oppTeam == "BYE":
                             print(f"{oppTeam}")

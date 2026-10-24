@@ -445,12 +445,13 @@ def formatScheduleSheet(ws: Worksheet, currentWeek):
                 right=thick
             )
 
-def printWeightedScoresToExcel(playersList, currRanks, filePath, ptThreshold=0):
+def printWeightedScoresToExcel(playersList, filePath, ptThreshold=0):
 
     scoreTypes = [
         "weightedScore1",
         "weightedScore2",
-        "weightedScore3"
+        "weightedScore3",
+        "weightedScore4"
     ]
 
     with pd.ExcelWriter(filePath, engine="openpyxl") as writer:
@@ -478,13 +479,15 @@ def printWeightedScoresToExcel(playersList, currRanks, filePath, ptThreshold=0):
                 data.append({
                     "Player Name": playerName,
                     "Weighted Score": round(score, 1),
+                    "Team" : stats["ownTeam"],
+                    "Team Rank" : stats["ownTeamRank"],
                     "Opp": opp,
-                    "Opp Rank": currRanks[opp]
+                    "Opp Rank": stats["currOppRank"]
                 })
 
             df = pd.DataFrame(
                 data,
-                columns=["Player Name", "Weighted Score", "Opp", "Opp Rank"]
+                columns=["Player Name", "Weighted Score", "Team", "Team Rank", "Opp", "Opp Rank"]
             )
 
             # Add ranking column

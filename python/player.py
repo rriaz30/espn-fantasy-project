@@ -8,6 +8,7 @@ class Player(object):
         self.proTeam = stats["proTeam"]
         self.fantasyTeam = stats["onTeamId"]
         self.pos = stats["position"]
+        self.injuryStatus = stats["injuryStatus"]
 
         self.stats = stats["stats"]
         self.schedule = stats["schedule"]
@@ -21,7 +22,7 @@ class Player(object):
     def getPtsForWeek(self, week):
         return self.stats.get(str(week), {}).get("points", 0)
 
-    def getAvgPts(self, start = 1, end = config.currentWeek):
+    def getAvgPts(self, start = 1, end = config.currDataWeek):
 
         totalPts = 0
         gamesPlayed = 0
@@ -34,3 +35,6 @@ class Player(object):
 
     def getOppByWeek(self, week):
         return self.schedule.get(str(week), {}).get("team", "BYE")
+
+    def getInjuryStatus(self):
+        return self.injuryStatus

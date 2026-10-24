@@ -8,8 +8,8 @@ from espn_api.football import Player
 from espn_api.football.constant import PRO_TEAM_MAP, POSITION_MAP
 from typing import Callable, Dict, List, Set, Tuple, Union
 from espn_api.football.settings import Settings
-
 from constants import POSITIONS, NFL_TEAMS
+import config
 
 # debug mode
 #league = League(league_id, year, espn_s2, swid, debug=False)
@@ -159,6 +159,9 @@ def getPtsAllowedStats(league: League, players: list, team: str):
     pro_schedule = league._get_all_pro_schedule()
     teamSched = pro_schedule[teamKey]
 
+    if (team == "CHI"):
+        print("team = ", team)
+
     # get opp points allowed by position up until current week
     
     stats = {
@@ -190,7 +193,9 @@ def getPtsAllowedStats(league: League, players: list, team: str):
 
     gamesPlayed = 0
 
-    for i in range(1, league.current_week+1):
+    # print("league.current_week+1 = " , league.current_week+1)
+    # print("config.currWeek = " , config.currDataWeek)
+    for i in range(1, config.currDataWeek+1):
         weekNumber = str(i)
         # check if week is a bye week
         if ((str(i)) not in teamSched):
@@ -222,6 +227,9 @@ def getPtsAllowedStats(league: League, players: list, team: str):
         else: opp = game["awayProTeamId"]
         oppName = PRO_TEAM_MAP[opp]
 
+        # if (team == "CHI"):
+        #     print("week # = ", weekNumber, " opp = " , opp)
+
         gamePlayed = 0
 
         stats["weeks"][weekNumber] = {
@@ -238,14 +246,19 @@ def getPtsAllowedStats(league: League, players: list, team: str):
             oppPosPlayers = getPosPlayersByTeam(players, position, oppName)
             ptsAllowed = 0
             for player in oppPosPlayers:
-                # print("player =", player.name)
+                # if (team == "CHI" and position == "WR"):
+                #     print("player =", player.name)
                 if i in player.stats:
                     ptsAllowed += player.stats[i].get("points", 0 )
-                    # print("ptsAllowed running total = ", ptsAllowed)
+                    # if (team == "CHI" and position == "WR"):
+                    #     print("ptsAllowed running total = ", ptsAllowed)
 
             # posStats[position][i] = round(ptsAllowed, 1)
             stats["weeks"][weekNumber]["allowed"][position] = round(ptsAllowed, 1)
             stats["totals"]["allowed"][position] += round(ptsAllowed, 1)
+            # if (team == "CHI" and position == "WR"):
+            #     print("weekly allower = ", stats["weeks"][weekNumber]["allowed"][position])
+            #     print("running total allowed = ", stats["totals"]["allowed"][position])
 
             # get points scored
             # iter thru own pos players and add them up
@@ -273,6 +286,9 @@ def getPtsAllowedStats(league: League, players: list, team: str):
     for position in POSITIONS:
         stats["averages"]["allowed"][position] = round(stats["totals"]["allowed"][position]/gamesPlayed, 1)
         stats["averages"]["scored"][position] = round(stats["totals"]["scored"][position]/gamesPlayed, 1)
+
+        if (team == "CHI" and position == "WR"):
+            print("final avg allowed = ", stats["averages"]["allowed"][position])
 
     stats['gamesPlayed'] = gamesPlayed
     return stats
@@ -335,22 +351,24 @@ def printStats(stats: {}):
 def getPtsByWeek(pos: str, allTeamStats: {}, option="allowed", weeksRequested = 0):
 
     ptsByWeek = {}
+
     currentWeek = len(allTeamStats['ARI']['weeks'])
+    # print("getPtsByWeek - currentWeek = ", currentWeek, " config.curr = ", config.currDataWeek)
 
     if weeksRequested == 0:
         initWeek = 1
     else:
-        initWeek = currentWeek - weeksRequested
+        initWeek = currentWeek+1 - weeksRequested
 
     for team in NFL_TEAMS:
         ptsByWeek[team] = {}
         gamesPlayed = 0
         totalPts = 0
-        for week in range(initWeek, currentWeek):
+        for week in range(initWeek, currentWeek+1):
             weekStats = [0,0]
             weekNum = str(week)
             # if (team == "CAR"):
-            #     print(allTeamStats["CAR"])
+                # print(allTeamStats["CAR"])
             weekData = allTeamStats[team]['weeks'][weekNum]
             weekPosData = weekData[option]
 
@@ -363,7 +381,9 @@ def getPtsByWeek(pos: str, allTeamStats: {}, option="allowed", weeksRequested = 
             runningAvg = round(totalPts/gamesPlayed, 1)
             weekStats[1] = runningAvg
 
-            ptsByWeek[team][str(week)] = weekStats    
+            ptsByWeek[team][str(week)] = weekStats
+            # if (team == "SF"):
+                # print("week = ", week , " - points = " , weekStats[0])    
 
     return ptsByWeek
 
