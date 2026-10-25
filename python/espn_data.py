@@ -1,6 +1,9 @@
 import truststore
 truststore.inject_into_ssl()
 
+# project imports
+import pandas as pd
+
 # NFL Import
 from espn_api.football import League
 from espn_api.football import Player
@@ -21,6 +24,9 @@ def fetchNflData(league_id, year, espn_s2, swid, nflSchedule, players, fantasyTe
     # private league with cookies
     league = League(league_id, year, espn_s2, swid)
     print("Current league week: ", league.current_week)
+
+    config.currLiveWeek = league.current_week
+    config.currDataWeek = league.current_week - 1
 
     # load players
     print("Loading all NFL fantasy players for your league")
@@ -141,7 +147,7 @@ def getPlayers(
     pro_schedule = league._get_all_pro_schedule()
 
     return [
-        Player(player, 2026, pro_schedule)
+        Player(player, league.year, pro_schedule)
         for player in players
     ]
 
@@ -348,7 +354,7 @@ def printStats(stats: {}):
         print(f"{position}: {stats['averages'][position]:.1f}", end="\t")
     print()
 
-def getPtsByWeek(pos: str, allTeamStats: {}, option="allowed", weeksRequested = 0):
+def getPtsByWeek(pos: str, allTeamStats, option="allowed", weeksRequested = 0):
 
     ptsByWeek = {}
 
@@ -378,7 +384,7 @@ def getPtsByWeek(pos: str, allTeamStats: {}, option="allowed", weeksRequested = 
             weekStats[0] = weekPosData[pos]
             totalPts = totalPts + weekPosData[pos]
 
-            runningAvg = round(totalPts/gamesPlayed, 1)
+            runningAvg = round(totalPts/gamesPlayed, 1) if gamesPlayed else 0
             weekStats[1] = runningAvg
 
             ptsByWeek[team][str(week)] = weekStats
@@ -431,3 +437,69 @@ def getCurrentRanks(ptsByWeek):
         currentRanks[team] = ptsByWeek[team][currentWeek][2]
 
     return currentRanks
+
+def getWeeklyPosReportData(allTeamStats, option, weeksRequested = 0):
+
+    weeklyPosReportData = {}
+
+    for pos in POSITIONS:
+        ptsByWeek = getPtsByWeek(pos, allTeamStats, option, weeksRequested)
+        ptsByWeek = addRunningRanks(ptsByWeek)
+
+        weeklyPosReportData[pos] = ptsByWeek
+
+    return weeklyPosReportData
+
+def getOverallPosRanks(allTeamStats, option: str):
+    # load points allowed by pos for each team
+    print(f"Calculating points {option} by position for each team")
+    
+    teamAverageStats = {}
+
+    for team in NFL_TEAMS:
+        # print(team)
+        teamAverageStats[team] = allTeamStats[team]['averages'][option]
+
+    # create 2d table for pts allowed
+    df = pd.DataFrame.from_dict(teamAverageStats, orient="index")
+    df.index.name = "Team"
+
+    for position in POSITIONS:
+        df[position + " Rank"] = df[position].rank(
+            ascending=False, method="min"
+        ).astype(int)
+
+    columns = []
+
+    for position in POSITIONS:
+        columns.append(position)
+        columns.append(position + " Rank")
+
+    df = df[columns]
+
+    return df
+
+def getNflScheduleDF(schedule):
+    games = {}
+
+    for team in schedule:
+        listOfOpp = []
+        for i in range(len(schedule[team]["games"])):
+            if schedule[team]["location"][i] == "AWAY":
+                listOfOpp.append(schedule[team]["games"][i] + "*")
+            else: listOfOpp.append(schedule[team]["games"][i])
+        
+        games[team] = listOfOpp
+
+    df = pd.DataFrame.from_dict(
+        games,
+        orient="index"
+    )
+
+    # Create Week 1, Week 2, ... column names
+    df.columns = [
+        f"{week}"
+        for week in range(1, len(df.columns) + 1)
+    ]
+
+    return df

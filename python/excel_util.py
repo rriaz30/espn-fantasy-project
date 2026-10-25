@@ -7,6 +7,7 @@ import win32com.client
 from pathlib import Path
 
 from constants import POSITIONS, NFL_TEAMS
+import config
 
 # Green range
 darkGreen = "006100"
@@ -60,161 +61,6 @@ def addFilter(ws):
             ws.freeze_panes = f"A{headerRow + 1}"
 
             break
-
-
-# main exce lfunctions
-def printOverallPosRankToExcel(allTeamStats, excelFile: str, option: str):
-    # load points allowed by pos for each team
-    print("Calculating points allowed by position for each team")
-    
-    teamAverageStats = {}
-
-    for team in NFL_TEAMS:
-        # print(team)
-        teamAverageStats[team] = allTeamStats[team]['averages'][option]
-
-    # create excel sheet for pts allowed
-    df = pd.DataFrame.from_dict(teamAverageStats, orient="index")
-    df.index.name = "Team"
-
-    for position in POSITIONS:
-        df[position + " Rank"] = df[position].rank(
-            ascending=False, method="min"
-        ).astype(int)
-
-    columns = []
-
-    for position in POSITIONS:
-        columns.append(position)
-        columns.append(position + " Rank")
-
-    df = df[columns]
-
-    if option == "allowed":
-        optionTitle = "Allowed"
-    else: optionTitle = "Scored"
-    print(f"Finished creating Points {optionTitle} excel file: {excelFile}")
-
-    with pd.ExcelWriter(excelFile, engine="openpyxl") as writer:
-
-        # Start the table on row 3, leaving room for the title
-        df.to_excel(
-            writer,
-            sheet_name="Points " + optionTitle,
-            startrow=1
-        )
-
-        ws = writer.sheets["Points " + optionTitle]
-
-        formatCells(ws)
-
-        # Merge the title across all table columns
-        last_col = df.shape[1] + 1
-        ws.merge_cells(
-            start_row=1,
-            start_column=1,
-            end_row=1,
-            end_column=last_col
-        )
-
-        # Add and format the title
-        title = ws.cell(row=1, column=1)
-        title.value = f"Points {optionTitle} By Position"
-        title.font = Font(size=20, bold=True)
-        title.alignment = Alignment(horizontal="center", vertical="center")
-
-        # Increase the title row's height
-        ws.row_dimensions[1].height = 35
-
-        headerRow = 2
-        firstDataRow = 3
-        lastDataRow = firstDataRow + len(df) - 1
-
-        for col in range(2, ws.max_column + 1):
-
-            header = ws.cell(row=headerRow, column=col).value
-
-            # Only format columns like "QB Rank", "RB Rank", etc.
-            if header and "Rank" in str(header):
-
-                for row in range(firstDataRow, lastDataRow + 1):
-
-                    cell = ws.cell(row=row, column=col)
-                    rank = cell.value
-
-                    cell.border = Border(right=thin)
-
-                    if rank is None:
-                        continue
-
-                    # Rank 1-10 = green
-                    if 1 <= rank <= 10:
-
-                        percent = (rank - 1) / 9
-
-                        color = interpolateColor(
-                            darkGreen,
-                            lightGreen,
-                            percent
-                        )
-
-                        cell.fill = PatternFill(
-                            fill_type="solid",
-                            fgColor=color
-                        )
-
-                    # Rank 22-32 = red
-                    elif 22 <= rank <= 32:
-
-                        percent = (rank - 22) / 10
-
-                        color = interpolateColor(
-                            lightRed,
-                            darkRed,
-                            percent
-                        )
-
-                        cell.fill = PatternFill(
-                            fill_type="solid",
-                            fgColor=color
-                        )
-        addFilter(ws)
-
-def createPositionDataFrame(ptsByWeek):
-    rows = {}
-
-    for team, weeks in ptsByWeek.items():
-        rows[team] = {}
-
-        for week, stats in weeks.items():
-            weekLabel = f"Week {week}"
-
-            rows[team][(weekLabel, "Pts")] = stats[0]
-            rows[team][(weekLabel, "Running Avg")] = stats[1]
-            rows[team][(weekLabel, "Rank")] = stats[2]
-
-    df = pd.DataFrame.from_dict(rows, orient="index")
-
-    df.index.name = "Team"
-    df.columns = pd.MultiIndex.from_tuples(df.columns)
-
-    return df
-
-def writePositionSheet(writer, df, pos, title):
-    sheetName = pos.replace("/", "_")
-
-    df.to_excel(writer, sheet_name=sheetName, startrow=1)
-
-    ws = writer.sheets[sheetName]
-
-    formatCells(ws)
-
-    # Remove the extra row pandas creates
-    ws.delete_rows(4)
-    ws["A2"] = "Team"
-    writeTitle(ws, title)
-
-    addFilter(ws)    
 
 def colorRankings(filePath):
 
@@ -282,10 +128,119 @@ def colorRankings(filePath):
                             fill_type="solid",
                             fgColor=color
                         )
-                
-
     wb.save(filePath)
 
+#########################
+## main excelfunctions ##
+#########################
+
+def exportOverallPosRanks(df, option, excelFile):
+
+    if option == "allowed":
+        optionTitle = "Allowed"
+    else: optionTitle = "Scored"
+    print(f"Finished creating Points {optionTitle} excel file: {excelFile}")
+
+    with pd.ExcelWriter(excelFile, engine="openpyxl") as writer:
+
+        # Start the table on row 3, leaving room for the title
+        df.to_excel(
+            writer,
+            sheet_name="Points " + optionTitle,
+            startrow=1
+        )
+
+        ws = writer.sheets["Points " + optionTitle]
+
+        formatCells(ws)
+
+        # Merge the title across all table columns
+        last_col = df.shape[1] + 1
+        ws.merge_cells(
+            start_row=1,
+            start_column=1,
+            end_row=1,
+            end_column=last_col
+        )
+
+        # Add and format the title
+        title = ws.cell(row=1, column=1)
+        title.value = f"Points {optionTitle} By Position"
+        title.font = Font(size=20, bold=True)
+        title.alignment = Alignment(horizontal="center", vertical="center")
+
+        # Increase the title row's height
+        ws.row_dimensions[1].height = 35
+
+        addFilter(ws)
+
+    # Color rankings in excel
+    colorRankings(excelFile)
+
+    return excelFile
+
+def createPositionDataFrame(ptsByWeek):
+    rows = {}
+
+    for team, weeks in ptsByWeek.items():
+        rows[team] = {}
+
+        for week, stats in weeks.items():
+            weekLabel = f"Week {week}"
+
+            rows[team][(weekLabel, "Pts")] = stats[0]
+            rows[team][(weekLabel, "Running Avg")] = stats[1]
+            rows[team][(weekLabel, "Rank")] = stats[2]
+
+    df = pd.DataFrame.from_dict(rows, orient="index")
+
+    df.index.name = "Team"
+    df.columns = pd.MultiIndex.from_tuples(df.columns)
+
+    return df
+
+def exportWeeklyPosReport(excelFile, weeklyPosReportData, option):
+
+    with pd.ExcelWriter(excelFile, engine="openpyxl") as writer:
+
+        for pos in POSITIONS:
+
+            df = createPositionDataFrame(weeklyPosReportData[pos])
+
+            title = pos + f" - Points {option.capitalize()} By Week"
+            writePositionSheet(writer, df, pos, title)
+
+    # Color rankings in excel
+    colorRankings(excelFile)
+
+    print(f"Saved Excel file to {excelFile}")
+
+    return excelFile
+
+def writePositionSheet(writer, df, pos, title):
+    sheetName = pos.replace("/", "_")
+
+    df.to_excel(writer, sheet_name=sheetName, startrow=1)
+
+    ws = writer.sheets[sheetName]
+
+    formatCells(ws)
+
+    # Remove the extra row pandas creates
+    ws.delete_rows(4)
+    ws["A2"] = "Team"
+    writeTitle(ws, title)
+
+    addFilter(ws)    
+
+def writePositionSheetColorSched(writer, df, pos):
+    sheetName = pos.replace("/", "_")
+
+    df.to_excel(writer, sheet_name=sheetName)
+
+    ws = writer.sheets[sheetName]
+
+    return ws 
 
 def writeTitle(ws, title):
     ws.merge_cells(
@@ -312,43 +267,22 @@ def writeTitle(ws, title):
     cell.alignment = Alignment(horizontal="center", vertical="center")
     ws.row_dimensions[1].height = 28
 
-def scheduleToExcel(schedule, filePath, currentWeek):
-    
-    games = {}
-
-    for team in schedule:
-        listOfOpp = []
-        for i in range(len(schedule[team]["games"])):
-            if schedule[team]["location"][i] == "AWAY":
-                listOfOpp.append(schedule[team]["games"][i] + "*")
-            else: listOfOpp.append(schedule[team]["games"][i])
-        
-        games[team] = listOfOpp
-
-    df = pd.DataFrame.from_dict(
-        games,
-        orient="index"
-    )
-
-    # Create Week 1, Week 2, ... column names
-    df.columns = [
-        f"{week}"
-        for week in range(1, len(df.columns) + 1)
-    ]
-
+def exportNflSSchedule(df, excelFile):
     # Name the left-most index
     df.index.name = "Team"
 
     # Write to Excel
-    df.to_excel(filePath, sheet_name="NFL Schedule")
+    df.to_excel(excelFile, sheet_name="NFL Schedule")
 
     # formatting
-    wb = load_workbook(filePath)
+    wb = load_workbook(excelFile)
     ws = wb["NFL Schedule"]
     formatCells(ws)
-    formatScheduleSheet(ws, currentWeek)
+    formatScheduleSheet(ws, config.currLiveWeek)
 
-    wb.save(filePath)
+    wb.save(excelFile)
+
+    return excelFile
 
 def colorScheduleByPosition(schedule, filePath, pos, currentWeek):
 
@@ -389,6 +323,53 @@ def colorScheduleByPosition(schedule, filePath, pos, currentWeek):
     formatScheduleSheet(ws, currentWeek)
 
     wb.save(filePath)
+
+def exportColorNflSSchedule(df, schedule, excelFile, currentWeek):
+
+    with pd.ExcelWriter(excelFile, engine="openpyxl") as writer:
+
+        for pos in POSITIONS:
+
+            ws = writePositionSheetColorSched(writer, df, pos)
+
+
+
+            formatCells(ws)
+
+            for row in range(2, ws.max_row + 1):
+
+                for col in range(2, ws.max_column + 1):
+
+                    cell = ws.cell(row=row, column=col)
+                    opponent = cell.value
+                    opponent = opponent.replace("*","")
+
+                    if opponent == "BYE":
+                        continue
+
+                    rank = schedule[opponent]["ranks"][pos]
+
+                    # Rank 1-10 = green
+                    if rank <= 10:
+                        color = greenColors[rank - 1]
+                        cell.fill = PatternFill(
+                            fill_type="solid",
+                            fgColor=color
+                        )
+
+                    # Rank 22-32 = red
+                    elif rank >= 22:
+                        color = redColors[rank - 22]
+                        cell.fill = PatternFill(
+                            fill_type="solid",
+                            fgColor=color
+                        )
+
+            formatScheduleSheet(ws, currentWeek)
+
+    print(f"Saved Excel file to {excelFile}")
+
+    return excelFile
 
 def formatCells(ws: Worksheet):
     for row in ws.iter_rows():
@@ -523,6 +504,45 @@ def printWeightedScoresToExcel(playersList, filePath, ptThreshold=0):
 
     colorRankings(filePath)
     print(f"Weighted Score report saved to {filePath}")
+
+def exportWeightedScores(playersWSRanks, filePath):
+
+    with pd.ExcelWriter(filePath, engine="openpyxl") as writer:
+
+        for scoreType, df in playersWSRanks.items():
+
+            # Write to separate worksheet
+            sheetName = scoreType.replace("weightedScore", "WS")
+            df.to_excel(
+                writer,
+                sheet_name=sheetName,
+                index=False
+            )
+
+            ws = writer.sheets[sheetName]
+
+            # Add Excel filters
+            ws.auto_filter.ref = ws.dimensions
+
+            # Freeze header row
+            ws.freeze_panes = "A2"
+
+            # Adjust column widths
+            for col in ws.columns:
+                maxLength = max(
+                    len(str(cell.value))
+                    if cell.value is not None else 0
+                    for cell in col
+                )
+
+                ws.column_dimensions[col[0].column_letter].width = maxLength + 2
+
+            formatCells(ws)
+
+    colorRankings(filePath)
+    print(f"Weighted Score report saved to {filePath}")
+
+    return filePath
 
 def closeExcelFile(filePath):
 

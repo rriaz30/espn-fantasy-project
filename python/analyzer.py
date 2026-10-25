@@ -6,8 +6,9 @@ import statistics
 from player import Player
 from proTeam import ProTeam
 import config
+import copy
 
-def getFAvsProjection(allTeamStats, players, nflSchedule, pos, trailingWeeks=0, futureWeek=0):
+def getFAvsProjection(allTeamStats, players, nflSchedule, pos, trailingWeeks=0, futureWeek=0, ptThreshold=0):
 
     # get stats of player points scored per game and their avg and their curr opp
     playersList = {}
@@ -28,7 +29,54 @@ def getFAvsProjection(allTeamStats, players, nflSchedule, pos, trailingWeeks=0, 
             if valid == True:
                 playersList[p["name"]] = playerStats
 
-    return playersList
+    # Sort players by weighted score (highest first)
+    scoreTypes = [
+        "weightedScore1",
+        "weightedScore2",
+        "weightedScore3",
+        "weightedScore4"
+    ]
+
+    playersWSRanks = {}
+
+    for scoreType in scoreTypes:
+
+        sortedPlayers = sorted(
+            playersList.items(),
+            key=lambda x: x[1][scoreType],
+            reverse=True
+        )
+        data = []
+
+        for playerName, stats in sortedPlayers:
+
+            score = stats[scoreType]
+
+            if score <= ptThreshold:
+                continue
+
+            opp = stats["currOpp"]
+
+            data.append({
+                "Player Name": playerName,
+                "Weighted Score": round(score, 1),
+                "Team" : stats["ownTeam"],
+                "Team Rank" : stats["ownTeamRank"],
+                "Opp": opp,
+                "Opp Rank": stats["currOppRank"]
+            })
+
+        df = pd.DataFrame(
+            data,
+            columns=["Player Name", "Weighted Score", "Team", "Team Rank", "Opp", "Opp Rank"]
+        )
+
+        # Add ranking column
+        df.insert(0, "Rank", range(1, len(df) + 1))
+
+        playersWSRanks[scoreType] = df
+
+    return playersWSRanks
 
 def calcPlayerWeightedScore(p, allTeamStats, nflSchedule, trailingWeeks=0, futureWeek=0):
 
@@ -100,7 +148,7 @@ def calcPlayerWeightedScore(p, allTeamStats, nflSchedule, trailingWeeks=0, futur
             #     print("teamScored = ", teamScored)
             #     print("oppAllowedAvg = ", oppAllowedAvg)
 
-    if ptTotal == 0:
+    if ptTotal == 0 or teamScoredTotal == 0:
         return playerStats, valid
 
     ptsScoredTeamRatio = ptTotal / teamScoredTotal
@@ -132,6 +180,8 @@ def calcPlayerWeightedScore(p, allTeamStats, nflSchedule, trailingWeeks=0, futur
         playerStats["ptDiffAvgByPct2"] = ptDiffExpectedTotal / (oppAllowedAvgTotal*ptsScoredTeamRatio / (weeks))
     except ZeroDivisionError:
         playerStats["ptDiffAverage"] = 0
+        playerStats["ptDiffAvgByPct1"] = 0
+        playerStats["ptDiffAvgByPct2"] = 0
 
 
     # now find curr opp avg pts allowed
@@ -143,7 +193,7 @@ def calcPlayerWeightedScore(p, allTeamStats, nflSchedule, trailingWeeks=0, futur
 
     # handle bye week
     if (currOpp == "BYE"): return playerStats, valid
-    
+
     # get opp rank and avg allowed depending on trailing weeks
     ptsByWeek = espn_data.getPtsByWeek(pos, allTeamStats, "allowed", trailingWeeks)
     ptsByWeek = espn_data.addRunningRanks(ptsByWeek)
@@ -151,11 +201,13 @@ def calcPlayerWeightedScore(p, allTeamStats, nflSchedule, trailingWeeks=0, futur
 
     playerStats["currOpp"] = currOpp
     playerStats["currOppRank"] = currRanks[currOpp]
-    currOppAvgAllowed = ptsByWeek[currOpp][str(currWeek)][0]
-    # print("currOpp = " , currOpp)
-    # print("ptsByWeek[currOpp] = " , ptsByWeek[currOpp])
-    # print("currOppRank = " , currRanks[currOpp])
-    # print("currOppAvgAllowed = ", currOppAvgAllowed)
+    currOppAvgAllowed = ptsByWeek[currOpp][str(currWeek)][1]
+    # if (p["name"] == "Tre Tucker"):
+    #     print("currWeek = " , currWeek)
+    #     print("currOpp = " , currOpp)
+    #     print("ptsByWeek[currOpp] = " , ptsByWeek[currOpp])
+    #     print("currOppRank = " , currRanks[currOpp])
+    #     print("currOppAvgAllowed = ", currOppAvgAllowed)
 
     # get own team rank
     ptsByWeek = espn_data.getPtsByWeek(pos, allTeamStats, "scored", trailingWeeks)
@@ -212,6 +264,95 @@ def getProjPtsVsFutureOpp(p: Player, opp: str, week, proTeams):
     playersTeamAvg = proTeams[p.getProTeam].getAverage("scored", p.pos)
     ptsScoredTeamRatio = playerAvgPts / playersTeamAvg
 
+def matchName(userInput, playerName):
 
+    playerName = playerName.strip().lower()
+    match = 0
+    error = 0
+    i = 0
+    j = playerName.find(userInput[i])
+    if j == -1: return 0
+    while i < len(userInput) and j < len(playerName):
+
+        if (userInput[i] == playerName[j]):
+            match +=1
+        elif ((len(playerName) > j+1) and (userInput[i] == playerName[j+1])):
+            match +=1
+            error +=1
+            j = j+1
+        elif ((len(userInput) > i+1) and (userInput[i+1] == playerName[j])):
+            match +=1
+            error +=1
+            i = i+1
+        else:
+            error += 1
+
+        if error > 5:
+            match = 0
+            break
+
+        i += 1
+        j += 1
+
+    matchPct = match / len(userInput) 
+    return matchPct
+
+def getPosRanks(allTeamStats, nflSchedule, option):
+
+    nflScheduleRanks = copy.deepcopy(nflSchedule)
+    
+    for team in constants.NFL_TEAMS:
+
+        nflScheduleRanks[team]["ranks"] = {}
+
+    for pos in constants.POSITIONS:
+
+        ptsByWeek = espn_data.getPtsByWeek(pos, allTeamStats, option)
+        ptsByWeek = espn_data.addRunningRanks(ptsByWeek)
+
+        for team in constants.NFL_TEAMS:
+
+            nflScheduleRanks[team]["ranks"][pos] = ptsByWeek[team][str(config.currDataWeek)][2]
+
+    return nflScheduleRanks
+
+def playerSearchMatches(userInput, players):
+    splitName = True
+    if " " in userInput:
+        splitName = False
+    userInput = userInput.strip().lower()
+
+    playersList = []
+    for p in players:
+        if p.get("stats", {}).get("0", {}).get("avg_points", 0) >= 5:
+            playersList.append(p)
+        
+    threshold = 0.7
+    playerFound = False
+    matchList = []
+
+    for p in playersList:
+
+        playerName = p["name"]
+
+        if splitName == True:
+            firstName, *lastName = playerName.split()
+            lastName = " ".join(lastName)
+
+            firstMatchPct = matchName(userInput, firstName)
+            lastMatchPct = matchName(userInput, lastName)
+
+            matchPct = max(firstMatchPct, lastMatchPct)
+        else:
+
+            matchPct = matchName(userInput, playerName)
+    
+        if matchPct > threshold:
+            matchList.append((p, matchPct))
+            playerFound = True
+
+    matchList.sort(key=lambda x: x[1], reverse=True)
+
+    return playerFound, matchList
 
 
