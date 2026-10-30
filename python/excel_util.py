@@ -24,9 +24,9 @@ greenColors = [
 ]
 
 redColors = [
-    "FDE8E8", "FBDADA", "F8CACA", "F4B6B6",
-    "EE9D9D", "E88080", "DF6262", "D54747",
-    "C92F2F", "B91F1F", "991B1B"
+    "FBDADA", "F8CACA", "F4B6B6", "EE9D9D",
+    "E88080", "DF6262", "D54747", "C92F2F",
+    "B91F1F", "991B1B"
 ]
 
 # Borders
@@ -73,9 +73,9 @@ def colorRankings(filePath):
     ]
 
     redColors = [
-        "FDE8E8", "FBDADA", "F8CACA", "F4B6B6",
-        "EE9D9D", "E88080", "DF6262", "D54747",
-        "C92F2F", "B91F1F", "991B1B"
+        "FBDADA", "F8CACA", "F4B6B6", "EE9D9D",
+        "E88080", "DF6262", "D54747", "C92F2F",
+        "B91F1F", "991B1B"
     ]
 
     # Loop through every worksheet
@@ -112,8 +112,8 @@ def colorRankings(filePath):
                         if 1 <= rank <= 10:
                             color = greenColors[rank - 1]
 
-                        elif 22 <= rank <= 32:
-                            color = redColors[rank - 22]
+                        elif 23 <= rank <= 32:
+                            color = redColors[rank - 23]
 
                         else:
                             continue
@@ -312,9 +312,9 @@ def colorScheduleByPosition(schedule, filePath, pos, currentWeek):
                     fgColor=color
                 )
 
-            # Rank 22-32 = red
-            elif rank >= 22:
-                color = redColors[rank - 22]
+            # Rank 23-32 = red
+            elif rank >= 23:
+                color = redColors[rank - 23]
                 cell.fill = PatternFill(
                     fill_type="solid",
                     fgColor=color
@@ -331,8 +331,6 @@ def exportColorNflSSchedule(df, schedule, excelFile, currentWeek):
         for pos in POSITIONS:
 
             ws = writePositionSheetColorSched(writer, df, pos)
-
-
 
             formatCells(ws)
 
@@ -357,9 +355,9 @@ def exportColorNflSSchedule(df, schedule, excelFile, currentWeek):
                             fgColor=color
                         )
 
-                    # Rank 22-32 = red
-                    elif rank >= 22:
-                        color = redColors[rank - 22]
+                    # Rank 23-32 = red
+                    elif rank >= 23:
+                        color = redColors[rank - 23]
                         cell.fill = PatternFill(
                             fill_type="solid",
                             fgColor=color

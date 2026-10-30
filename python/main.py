@@ -51,44 +51,6 @@ proTeams = {}
 def clearConsole():
     os.system("cls")
 
-# def loadJsonData():
-    
-#     try:
-#         allTeamStats = json_util.loadDataFromJson(teamStatsJson)
-#         nflSchedule = json_util.loadDataFromJson(scheduleJson)
-#         players = json_util.loadDataFromJson(playersJson)
-#         fantasyTeams = json_util.loadDataFromJson(fantasyTeamsJson)
-
-#         if allTeamStats:
-#             print("Data loaded successfully")
-
-#         config.currDataWeek = len(allTeamStats['ARI']['weeks'])
-#         config.currLiveWeek = config.currDataWeek + 1
-
-#         return allTeamStats, nflSchedule, players, fantasyTeams
-#     except:
-#         print("Missing Data files. Fetch data first.")
-#         return {}, {}, [], {}
-
-# def fetchESPNdata():
-
-#     global allTeamStats, nflSchedule, players, fantasyTeams
-
-#     print("Fetching ESPN data...")
-#     # first reset data structs
-#     allTeamStats = {}
-#     nflSchedule = {}
-#     players = []
-#     fantasyTeams = {}
-
-#     allTeamStats = espn_data.fetchNflData(league_id, year, espn_s2, swid, nflSchedule, players, fantasyTeams)
-#     dataDir = Path(__file__).resolve().parent.parent / "data"
-#     dataDir.mkdir(parents=True, exist_ok=True)
-#     json_util.saveDataToJson(allTeamStats, teamStatsJson)
-#     json_util.saveDataToJson(nflSchedule, dataDir / scheduleJson)
-#     json_util.saveDataToJson(players, dataDir / playersJson)
-#     json_util.saveDataToJson(fantasyTeams, dataDir / fantasyTeamsJson)
-
 def generateReportsMenu():
     while True:
 
@@ -181,8 +143,6 @@ def schedulesMenu():
         elif choice == "2":
             print("Generate NFL Schedule with Positional Heat Map")
 
-            ### TODO skip pos input, just loop thru all pos and make sheets
-
             optionStr = getPtsType()
             if optionStr == "back": continue
             
@@ -190,13 +150,9 @@ def schedulesMenu():
             excel_util.closeExcelFile(excelFile)
 
             nflScheduleDF = espn_data.getNflScheduleDF(nflSchedule)
-            # filePath = excel_util.exportNflSSchedule(nflScheduleData, excelFile)
 
             nflScheduleRanks = analyzer.getPosRanks(allTeamStats, nflSchedule, optionStr)
             filePath = excel_util.exportColorNflSSchedule(nflScheduleDF, nflScheduleRanks, excelFile, schedCurrWeek)
-
-            # excel_util.scheduleToExcel(nflSchedule, excelFile, schedCurrWeek)
-            # excel_util.colorScheduleByPosition(nflSchedule, excelFile, posTag, schedCurrWeek)
 
             print(f"Printing NFL Schedule with Positional Heat Map for Current Week - {config.currLiveWeek}")
             os.startfile(filePath)
@@ -311,9 +267,9 @@ def analyzeFAAvailable():
     playersWSRanks = analyzer.getFAvsProjection(allTeamStats, players, nflSchedule, pos, trailingWeeks, futureWeek, ptThreshold)
 
     if trailingWeeks == 0:
-        excelFile = outputDir / f"WeightedScores-{pos}-week-{config.currLiveWeek}.xlsx"
+        excelFile = outputDir / f"WeightedScores-{posInput}-week-{config.currLiveWeek}.xlsx"
     else:
-        excelFile = outputDir / f"WeightedScores-{pos}-week-{config.currLiveWeek}-trailing-{trailingWeeks}.xlsx"
+        excelFile = outputDir / f"WeightedScores-{posInput}-week-{config.currLiveWeek}-trailing-{trailingWeeks}.xlsx"
     excel_util.closeExcelFile(excelFile)
     # excel_util.printWeightedScoresToExcel(playersList, excelFile, ptThreshold)
     filePath = excel_util.exportWeightedScores(playersWSRanks, excelFile)
