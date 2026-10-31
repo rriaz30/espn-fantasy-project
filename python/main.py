@@ -320,6 +320,41 @@ def analyzeFAAvailable():
 
     os.startfile(filePath)
 
+def realPosRanksMenu():
+    print("Get real position ranks")
+
+    minGames = input("Enter min games: ")
+    if (minGames == ""):
+        minGames = 0
+    else:
+        minGames = int(minGames)
+
+    minPtsThreshold = input("Enter min points threshold: ")
+    if (minPtsThreshold == ""):
+        minPtsThreshold = 7
+    else:
+        minPtsThreshold = int(minPtsThreshold)
+
+    trailingWeeks = input("Enter Trailing Weeks: ")
+    if (trailingWeeks == ""):
+        trailingWeeks = 0
+    else:
+        trailingWeeks = int(trailingWeeks)
+
+    if trailingWeeks == 0:
+        excelFile = outputDir / f"RealPosRanks-week-{config.currLiveWeek}.xlsx"
+    else:
+        excelFile = outputDir / f"RealPosRanks-week-{config.currLiveWeek}-trailing-{trailingWeeks}.xlsx"
+
+    excel_util.closeExcelFile(excelFile)
+    realPosRanksDF = analyzer.getRealPosRanks(allTeamStats, players, minPtsThreshold, minGames, trailingWeeks)
+    filePath = excel_util.exportRealPosRanks(realPosRanksDF, excelFile)
+
+    os.startfile(filePath)
+
+
+
+
 ################################################################################################
 ################################################################################################
 ################################################################################################
@@ -360,9 +395,10 @@ def main():
         print("1. Fetch ESPN data")
         print("2. Generate Points/Rank Reports")
         print("3. Generate Schedules")
-        print("4. WIP - Team Analyzer - not started")
-        print("5. Player Analyzer WIP")
-        print("6. Player Search")
+        print("4. Player Analyzer WIP")
+        print("5. Player Search")
+        print("6. See Real Position Ranks")
+        print("8. WIP - Team Analyzer - not started")
         print("9. Exit")
 
         choice = input("\nSelect an option: ")
@@ -383,14 +419,17 @@ def main():
             schedulesMenu()
 
         elif choice == "4":
-            # WIP team analyzer
-            print("WIP Team Analyzer")
-
-        elif choice == "5":
             analyzeFAAvailable()
 
+        elif choice == "5":
+            playerSearchMenu()    
+
         elif choice == "6":
-            playerSearchMenu()           
+            realPosRanksMenu()
+
+        elif choice == "8":
+            # WIP team analyzer
+            print("WIP Team Analyzer")       
 
         elif choice == "9":
             print("Goodbye!")
