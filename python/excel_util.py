@@ -6,16 +6,8 @@ from openpyxl.worksheet.worksheet import Worksheet
 import win32com.client
 from pathlib import Path
 
-from constants import POSITIONS, NFL_TEAMS
+from constants import POSITIONS, NFL_TEAMS, GREEN_COLORS, RED_COLORS
 import config
-
-# Green range
-darkGreen = "006100"
-lightGreen = "C6EFCE"
-
-# Red range
-lightRed = "FFC7CE"
-darkRed = "9C0006"
 
 greenColors = [
     "147D39", "208A43", "31994E", "49A75F",
