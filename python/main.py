@@ -303,7 +303,7 @@ def realPosRanksMenu():
         excelFile = outputDir / f"RealPosRanks-week-{config.currLiveWeek}-trailing-{trailingWeeks}.xlsx"
 
     excel_util.closeExcelFile(excelFile)
-    realPosRanksDF = analyzer.getRealPosRanks(allTeamStats, players, minPtsThreshold, minGames, trailingWeeks)
+    realPosRanksDF = analyzer.getRealPosRanks(allTeamStats, players, fantasyTeams, minPtsThreshold, minGames, trailingWeeks)
     filePath = excel_util.exportRealPosRanks(realPosRanksDF, excelFile)
 
     os.startfile(filePath)

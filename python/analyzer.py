@@ -358,7 +358,7 @@ def playerSearchMatches(userInput, players):
 
     return playerFound, matchList
 
-def getRealPosRanks(allTeamStats, players, minPtsThreshold, minGames=0, trailingWeeks=0):
+def getRealPosRanks(allTeamStats, players, fantasyTeams, minPtsThreshold, minGames=0, trailingWeeks=0):
 
     if trailingWeeks == 0:
         startWeek = 1
@@ -397,10 +397,12 @@ def getRealPosRanks(allTeamStats, players, minPtsThreshold, minGames=0, trailing
                     opp = p["schedule"].get(str(config.currDataWeek + 1), {}).get("team", "BYE")
                     oppRank = teamRankings.get(opp, "BYE")
 
+                    fTeam = fantasyTeams.get(str(p["onTeamId"]), {}).get("teamName", "FREE_AGENT")
+
                     data = {
                         "name": p["name"],
                         "proTeam": p["proTeam"],
-                        "fantasyTeam": p["onTeamId"],
+                        "fantasyTeam": fTeam,
                         "average": round(totalPts / gamesPlayed, 2),
                         "gamesPlayed": gamesPlayed,
                         "opp": opp,
