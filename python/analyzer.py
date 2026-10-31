@@ -256,6 +256,9 @@ def calcPlayerWeightedScore(p, allTeamStats, nflSchedule, trailingWeeks=0, futur
 
 
 def getProjPtsVsFutureOpp(p: Player, opp: str, week, proTeams):
+    #############
+    ### TODO ####
+    ##############
     print(f"Get proj points for {p.getName()} vs {opp} in week {week}")
     print("Using WS3")
 
@@ -355,4 +358,82 @@ def playerSearchMatches(userInput, players):
 
     return playerFound, matchList
 
+def getRealPosRanks(allTeamStats, players, minPtsThreshold, minGames=0, trailingWeeks=0):
 
+    if trailingWeeks == 0:
+        startWeek = 1
+    else:
+        startWeek = config.currDataWeek+1 - trailingWeeks
+
+    if minGames == 0:
+        minGames = 3
+
+    realPosRanksDF = {}
+
+    for pos in constants.POSITIONS:
+
+        teamRankings = espn_data.getPtsByWeek(pos, allTeamStats, "allowed", trailingWeeks)
+        teamRankings = espn_data.addRunningRanks(teamRankings)
+        teamRankings = espn_data.getCurrentRanks(teamRankings)
+        
+        elgibleList = []
+
+        for p in players:
+
+            if p["position"] == pos:
+                gamesPlayed = 0
+                totalPts = 0
+                # iter thru games to count games played
+                for i in range(startWeek, config.currDataWeek+1):
+                    weekStats = p["stats"].get(str(i), {})
+
+                    if weekStats.get("breakdown"):
+                        totalPts += weekStats["points"]
+                        gamesPlayed += 1
+
+                if gamesPlayed >= minGames:
+                    if (totalPts / gamesPlayed) <= minPtsThreshold: continue
+
+                    opp = p["schedule"].get(str(config.currDataWeek + 1), {}).get("team", "BYE")
+                    oppRank = teamRankings.get(opp, "BYE")
+
+                    data = {
+                        "name": p["name"],
+                        "proTeam": p["proTeam"],
+                        "fantasyTeam": p["onTeamId"],
+                        "average": round(totalPts / gamesPlayed, 2),
+                        "gamesPlayed": gamesPlayed,
+                        "opp": opp,
+                        "oppRank": oppRank
+                    }
+
+                    elgibleList.append(data)
+
+        elgibleList.sort(
+            key=lambda p: p["average"],
+            reverse=True
+        )
+
+        top50List = elgibleList[:50]
+
+        df = pd.DataFrame(top50List)
+
+        df.rename(
+            columns = {
+                "name":"Player Name", 
+                "proTeam": "Pro Team", 
+                "fantasyTeam": "Fantasy Team", 
+                "average": "Average",
+                "gamesPlayed":"Games Played",
+                "opp": "Next Opp",
+                "oppRank": "Opp Rank"
+            },
+            inplace = True
+        )
+
+        # Add ranking column
+        df.insert(0, "Top Guys", range(1, len(df) + 1))
+
+        realPosRanksDF[pos] = df
+
+    return realPosRanksDF

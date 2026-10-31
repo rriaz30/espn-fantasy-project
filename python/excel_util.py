@@ -212,7 +212,7 @@ def exportWeeklyPosReport(excelFile, weeklyPosReportData, option):
 def writePositionSheet(writer, df, pos, title):
     sheetName = pos.replace("/", "_")
 
-    df.to_excel(writer, sheet_name=sheetName, startrow=1)
+    df.to_excel(writer, sheet_name=sheetName, startrow=1, index=False)
 
     ws = writer.sheets[sheetName]
 
@@ -220,10 +220,12 @@ def writePositionSheet(writer, df, pos, title):
 
     # Remove the extra row pandas creates
     ws.delete_rows(4)
-    ws["A2"] = "Team"
+    ws["A2"] = "PLayer Rank"
     writeTitle(ws, title)
 
-    addFilter(ws)    
+    addFilter(ws)
+
+    return ws    
 
 def writePositionSheetColorSched(writer, df, pos):
     sheetName = pos.replace("/", "_")
@@ -533,6 +535,48 @@ def exportWeightedScores(playersWSRanks, filePath):
     print(f"Weighted Score report saved to {filePath}")
 
     return filePath
+    
+def exportRealPosRanks(realPosRanksDF, excelFile):
+
+    with pd.ExcelWriter(excelFile, engine="openpyxl") as writer:
+
+        for pos, df in realPosRanksDF.items():
+
+            sheetName = pos.replace("/", "_")
+
+            df.to_excel(
+                writer,
+                sheet_name=sheetName,
+                index=False
+            )
+
+            ws = writer.sheets[sheetName]
+
+            # Add Excel filters
+            ws.auto_filter.ref = ws.dimensions
+
+            # Freeze header row
+            ws.freeze_panes = "A2"
+
+            # Adjust column widths
+            for col in ws.columns:
+                maxLength = max(
+                    len(str(cell.value))
+                    if cell.value is not None else 0
+                    for cell in col
+                )
+
+                ws.column_dimensions[
+                    col[0].column_letter
+                ].width = maxLength + 2
+
+            formatCells(ws)
+
+    colorRankings(excelFile)
+
+    print(f"Saved Excel file to {excelFile}")
+
+    return excelFile 
 
 def closeExcelFile(filePath):
 

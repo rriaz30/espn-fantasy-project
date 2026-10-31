@@ -165,8 +165,8 @@ def getPtsAllowedStats(league: League, players: list, team: str):
     pro_schedule = league._get_all_pro_schedule()
     teamSched = pro_schedule[teamKey]
 
-    if (team == "CHI"):
-        print("team = ", team)
+    # if (team == "CHI"):
+        # print("team = ", team)
 
     # get opp points allowed by position up until current week
     
