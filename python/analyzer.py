@@ -15,9 +15,7 @@ def getFAvsProjection(allTeamStats, players, nflSchedule, pos, trailingWeeks=0, 
     for p in players:
         if ((p["position"] == pos and p["proTeam"] != "None" and p["onTeamId"] == 0)
             or 
-            (p["position"] == pos and p["onTeamId"] == 1)): # The RFL
-            # (p["position"] == pos and p["onTeamId"] == 3)): # The RFL - dc snappers
-            # (p["position"] == pos and p["onTeamId"] == 11)): # The Tommy Foundation
+            (p["position"] == pos and p["onTeamId"] == config.fantasyTeamNum)):
 
             if not (p["injuryStatus"] == "ACTIVE" or p["injuryStatus"] == "QUESTIONABLE" or p["injuryStatus"] == [] ):
                 continue
@@ -116,7 +114,7 @@ def calcPlayerWeightedScore(p, allTeamStats, nflSchedule, trailingWeeks=0, futur
         while True:
             if (statWeek <= 0):
                 break
-            if str(statWeek) in p["stats"] and statWeek not in recordedWeeks:
+            if str(statWeek) in p["stats"] and str(statWeek) in p["schedule"] and statWeek not in recordedWeeks:
                 recordedWeeks.append(statWeek)
                 break
             else:

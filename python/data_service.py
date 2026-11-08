@@ -7,6 +7,7 @@ import json_util
 
 
 def loadJsonData(dataDir):
+
     dataDir = Path(dataDir)
 
     try:
@@ -15,8 +16,19 @@ def loadJsonData(dataDir):
         players = json_util.loadDataFromJson(dataDir / "Players.json")
         fantasyTeams = json_util.loadDataFromJson(dataDir / "FantasyTeams.json")
 
-        config.currDataWeek = len(allTeamStats["ARI"]["weeks"])
-        config.currLiveWeek = config.currDataWeek + 1
+        with open(dataDir / "FetchInfo.txt", "r") as file:
+            lines = [line.strip() for line in file]
+
+        leagueInfo = lines[0].split(":", 1)[1].strip()
+        config.league_id, config.league_name = leagueInfo.split(" - ", 1)
+        config.league_id = int(config.league_id)
+
+        config.currLiveWeek = int(lines[1].split(":", 1)[1].strip())
+        config.currDataWeek = int(lines[2].split(":", 1)[1].strip())
+
+        fantasyInfo = lines[3].split(":", 1)[1].strip()
+        config.fantasyTeamNum, config.fantasyTeamName = fantasyInfo.split(" - ", 1)
+        config.fantasyTeamNum = int(config.fantasyTeamNum)
 
         return allTeamStats, nflSchedule, players, fantasyTeams
 
@@ -25,7 +37,7 @@ def loadJsonData(dataDir):
         return {}, {}, [], {}
 
 
-def fetchESPNdata(dataDir, league_id, year, espn_s2, swid):
+def fetchESPNdata(dataDir, league_id, year, espn_s2, swid, fantasyTeamNum=None):
     dataDir = Path(dataDir)
     dataDir.mkdir(parents=True, exist_ok=True)
 
@@ -40,7 +52,9 @@ def fetchESPNdata(dataDir, league_id, year, espn_s2, swid):
         swid,
         nflSchedule,
         players,
-        fantasyTeams
+        fantasyTeams,
+        fantasyTeamNum=fantasyTeamNum,
+        dataDir=dataDir
     )
 
     json_util.saveDataToJson(allTeamStats, dataDir / "TeamStatsData.json")

@@ -13,6 +13,7 @@ from typing import Callable, Dict, List, Set, Tuple, Union
 from espn_api.football.settings import Settings
 from constants import POSITIONS, NFL_TEAMS
 import config
+from pathlib import Path
 
 # debug mode
 #league = League(league_id, year, espn_s2, swid, debug=False)
@@ -20,7 +21,7 @@ import config
 #league = League(league_id, year, espn_s2, swid, fetch_league=True)
 
 
-def fetchNflData(league_id, year, espn_s2, swid, nflSchedule, players, fantasyTeams):
+def fetchNflData(league_id, year, espn_s2, swid, nflSchedule, players, fantasyTeams, fantasyTeamNum=None, dataDir=None):
     # private league with cookies
     league = League(league_id, year, espn_s2, swid)
     print("Current league week: ", league.current_week)
@@ -48,6 +49,17 @@ def fetchNflData(league_id, year, espn_s2, swid, nflSchedule, players, fantasyTe
             roster.append(p.name)
         teamData["players"] = roster
         fantasyTeams[team.team_id] = teamData
+
+    if fantasyTeamNum is None:
+        # Preserve existing CLI behavior
+        fantasyTeamNum, fantasyTeamName = selectFantasyTeam(fantasyTeams)
+    else:
+        fantasyTeamNum = int(fantasyTeamNum)
+
+        if fantasyTeamNum not in fantasyTeams:
+            raise ValueError("Selected fantasy team not found in league")
+
+        fantasyTeamName = fantasyTeams[fantasyTeamNum]["teamName"]
 
     # load nfl team stats
     allTeamStats = {}
@@ -93,20 +105,30 @@ def fetchNflData(league_id, year, espn_s2, swid, nflSchedule, players, fantasyTe
         nflSchedule[team]["games"] = listOfOpp
         nflSchedule[team]["location"] = listOfLoc
 
-    print("\nTeam data loaded succesfully")
+    dataDir = Path(dataDir) if dataDir is not None else Path("data")
+    dataDir.mkdir(parents=True, exist_ok=True)
 
-    # all teamstats format
-    # allTeamStats = {
-    #     "ARI": stats,
-    #     "ATL": stats,
-    # }
+    filePath = dataDir / "FetchInfo.txt"
+
+    leagueName = ""
+    for key, val in config.leagues.items():
+        if (val[0] == league_id):
+            leagueName = val[1]
+            break
+
+    with open(filePath, "w") as file:
+        file.write(f"League ID: {league_id} - {leagueName}\n")
+        file.write(f"Live Week: {config.currLiveWeek}\n")
+        file.write(f"Data Week: {config.currDataWeek}\n")
+        file.write(f"Fantasy Team: {fantasyTeamNum} - {fantasyTeamName}")
+
+    config.fantasyTeamNum = fantasyTeamNum
+    config.fantasyTeamName = fantasyTeamName
+    config.league_name = leagueName
+
+    print(f"\nLeague Data for {leagueName} - {fantasyTeamName} loaded successfully\n")
 
     return allTeamStats
-
-# def getFreeAgents(league_id, year, espn_s2, swid):
-#     league = League(league_id, year, espn_s2, swid)
-#     return league.free_agents(league.current_week, 1)
-
 
 def getPosPlayersByTeam(
     players: list,
@@ -293,8 +315,8 @@ def getPtsAllowedStats(league: League, players: list, team: str):
         stats["averages"]["allowed"][position] = round(stats["totals"]["allowed"][position]/gamesPlayed, 1)
         stats["averages"]["scored"][position] = round(stats["totals"]["scored"][position]/gamesPlayed, 1)
 
-        if (team == "CHI" and position == "WR"):
-            print("final avg allowed = ", stats["averages"]["allowed"][position])
+        # if (team == "CHI" and position == "WR"):
+        #     print("final avg allowed = ", stats["averages"]["allowed"][position])
 
     stats['gamesPlayed'] = gamesPlayed
     return stats
@@ -438,6 +460,18 @@ def getCurrentRanks(ptsByWeek):
 
     return currentRanks
 
+# def getWeeklyPosReportData(allTeamStats, option, weeksRequested = 0):
+
+#     weeklyPosReportData = {}
+
+#     for pos in POSITIONS:
+#         ptsByWeek = getPtsByWeek(pos, allTeamStats, option, weeksRequested)
+#         ptsByWeek = addRunningRanks(ptsByWeek)
+
+#         weeklyPosReportData[pos] = ptsByWeek
+
+#     return weeklyPosReportData
+
 def getWeeklyPosReportData(allTeamStats, option, weeksRequested = 0):
 
     weeklyPosReportData = {}
@@ -446,7 +480,24 @@ def getWeeklyPosReportData(allTeamStats, option, weeksRequested = 0):
         ptsByWeek = getPtsByWeek(pos, allTeamStats, option, weeksRequested)
         ptsByWeek = addRunningRanks(ptsByWeek)
 
-        weeklyPosReportData[pos] = ptsByWeek
+        rows = {}
+
+        for team, weeks in ptsByWeek.items():
+            rows[team] = {}
+
+            for week, stats in weeks.items():
+                weekLabel = f"Week {week}"
+
+                rows[team][(weekLabel, "Pts")] = stats[0]
+                rows[team][(weekLabel, "Avg")] = stats[1]
+                rows[team][(weekLabel, "Rank")] = stats[2]
+
+        df = pd.DataFrame.from_dict(rows, orient="index")
+
+        df.index.name = "Team"
+        df.columns = pd.MultiIndex.from_tuples(df.columns)
+
+        weeklyPosReportData[pos] = df
 
     return weeklyPosReportData
 
@@ -503,3 +554,35 @@ def getNflScheduleDF(schedule):
     ]
 
     return df
+
+def selectFantasyTeam(fantasyTeams):
+    print("\nSelect your fantasy team:")
+    
+    for i in range(1, len(fantasyTeams) + 1):
+        print(f"({i})\t{fantasyTeams[i]["teamName"]}")
+    
+    while (True):
+        team = input(">> ")
+        team = int(team)
+        if team >= 1 and team <= len(fantasyTeams):
+            return team, fantasyTeams[team]["teamName"]
+
+def selectLeague():
+    print("\nSelect your league:")
+
+    for i in range(1, len(config.leagues) + 1):
+        print(f"({i})\t{config.leagues[i][1]}")
+
+    while (True):
+        league = input(">> ")
+        league = int(league)
+        if league >= 1 and league <= len(config.leagues):
+            return config.leagues[league][0]
+
+def getFantasyTeamOptions(league_id, year, espn_s2, swid):
+    league = League(league_id, year, espn_s2, swid)
+
+    return {
+        team.team_id: team.team_name
+        for team in league.teams
+    }

@@ -309,8 +309,6 @@ def realPosRanksMenu():
     os.startfile(filePath)
 
 
-
-
 ################################################################################################
 ################################################################################################
 ################################################################################################
@@ -318,7 +316,6 @@ def realPosRanksMenu():
 def main():
     global allTeamStats, nflSchedule, players, fantasyTeams, proTeams
 
-    print("Checking for saved data")
     allTeamStats, nflSchedule, players, fantasyTeams = data_service.loadJsonData(dataDir)
 
     # check if data has been loaded
@@ -338,9 +335,6 @@ def main():
 
     for team in constants.NFL_TEAMS:
         proTeams[team] = proTeam.ProTeam(allTeamStats[team])
-
-    print("Current Week:", config.currLiveWeek)
-    print("Data based off week:", config.currDataWeek)
     
     while True:
 
@@ -362,6 +356,7 @@ def main():
 
         if choice == "1":
             # fetchESPNdata()
+            league_id = espn_data.selectLeague()
             allTeamStats, nflSchedule, players, fantasyTeams = data_service.fetchESPNdata(dataDir, league_id, year, espn_s2, swid)
             allTeamStats, nflSchedule, players, fantasyTeams = data_service.loadJsonData(dataDir)
 

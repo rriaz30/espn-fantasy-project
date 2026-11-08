@@ -37,22 +37,23 @@ def interpolateColor(startColor, endColor, percent):
 
     return "".join(f"{value:02X}" for value in rgb)
 
-def addFilter(ws):
-    # Add filters to every column
-    for row in ws.iter_rows():
-        if any("Rank" in str(cell.value) for cell in row):
-            headerRow = row[0].row
+def addFilter(ws, headerRow=None):
 
-            # Add filters
-            ws.auto_filter.ref = (
-                f"A{headerRow}:"
-                f"{ws.cell(ws.max_row, ws.max_column).coordinate}"
-            )
+    if headerRow is None:
+        for row in ws.iter_rows():
+            if any("Rank" in str(cell.value) for cell in row):
+                headerRow = row[0].row
+                break
 
-            # Freeze header row and all rows above it
-            ws.freeze_panes = f"A{headerRow + 1}"
+    if headerRow is None:
+        return
 
-            break
+    ws.auto_filter.ref = (
+        f"A{headerRow}:"
+        f"{ws.cell(ws.max_row, ws.max_column).coordinate}"
+    )
+
+    ws.freeze_panes = f"A{headerRow + 1}"
 
 def colorRankings(filePath):
 
@@ -171,25 +172,43 @@ def exportOverallPosRanks(df, option, excelFile):
 
     return excelFile
 
-def createPositionDataFrame(ptsByWeek):
-    rows = {}
+# def createPositionDataFrame(ptsByWeek):
+#     rows = {}
 
-    for team, weeks in ptsByWeek.items():
-        rows[team] = {}
+#     for team, weeks in ptsByWeek.items():
+#         rows[team] = {}
 
-        for week, stats in weeks.items():
-            weekLabel = f"Week {week}"
+#         for week, stats in weeks.items():
+#             weekLabel = f"Week {week}"
 
-            rows[team][(weekLabel, "Pts")] = stats[0]
-            rows[team][(weekLabel, "Running Avg")] = stats[1]
-            rows[team][(weekLabel, "Rank")] = stats[2]
+#             rows[team][(weekLabel, "Pts")] = stats[0]
+#             rows[team][(weekLabel, "Running Avg")] = stats[1]
+#             rows[team][(weekLabel, "Rank")] = stats[2]
 
-    df = pd.DataFrame.from_dict(rows, orient="index")
+#     df = pd.DataFrame.from_dict(rows, orient="index")
 
-    df.index.name = "Team"
-    df.columns = pd.MultiIndex.from_tuples(df.columns)
+#     df.index.name = "Team"
+#     df.columns = pd.MultiIndex.from_tuples(df.columns)
 
-    return df
+#     return df
+
+# def exportWeeklyPosReport(excelFile, weeklyPosReportData, option):
+
+#     with pd.ExcelWriter(excelFile, engine="openpyxl") as writer:
+
+#         for pos in POSITIONS:
+
+#             df = createPositionDataFrame(weeklyPosReportData[pos])
+
+#             title = pos + f" - Points {option.capitalize()} By Week"
+#             writePositionSheet(writer, df, pos, title)
+
+#     # Color rankings in excel
+#     colorRankings(excelFile)
+
+#     print(f"Saved Excel file to {excelFile}")
+
+#     return excelFile
 
 def exportWeeklyPosReport(excelFile, weeklyPosReportData, option):
 
@@ -197,7 +216,7 @@ def exportWeeklyPosReport(excelFile, weeklyPosReportData, option):
 
         for pos in POSITIONS:
 
-            df = createPositionDataFrame(weeklyPosReportData[pos])
+            df = weeklyPosReportData[pos]
 
             title = pos + f" - Points {option.capitalize()} By Week"
             writePositionSheet(writer, df, pos, title)
@@ -212,7 +231,7 @@ def exportWeeklyPosReport(excelFile, weeklyPosReportData, option):
 def writePositionSheet(writer, df, pos, title):
     sheetName = pos.replace("/", "_")
 
-    df.to_excel(writer, sheet_name=sheetName, startrow=1, index=False)
+    df.to_excel(writer, sheet_name=sheetName, startrow=1, index=True)
 
     ws = writer.sheets[sheetName]
 
@@ -223,7 +242,7 @@ def writePositionSheet(writer, df, pos, title):
     ws["A2"] = "PLayer Rank"
     writeTitle(ws, title)
 
-    addFilter(ws)
+    addFilter(ws, headerRow=3)
 
     return ws    
 
